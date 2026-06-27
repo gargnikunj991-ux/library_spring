@@ -1,6 +1,7 @@
 package com.nikunj.library.controller;
 
 import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,29 +13,30 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nikunj.library.model.Book;
 import com.nikunj.library.repository.BookRepository;
+import com.nikunj.library.service.BookService;
 
 @RestController
 @RequestMapping("/api/books")
 public class BookController {
 
     @Autowired
-    private BookRepository bookRepository;   
+    private BookService bookService;   
    
     @GetMapping
     public List<Book> getAllBook(){
-        return bookRepository.findAll();
+        return bookService.displayBook();
     }
 
     @PostMapping
     public Book addBook(@RequestBody Book book) {
-        return bookRepository.save(book);
+        return bookService.addBook(book);
     }
     @GetMapping("/{id}")
     public Book getBookId(@PathVariable Long id){
-        return bookRepository.findById(id).get();
+        return bookService.getBookById(id);
     }
     @DeleteMapping("/{id}")
     public void deleteBookId(@PathVariable Long id){
-         bookRepository.deleteById(id);
+         bookService.deleteBook(id);
     }
 }
