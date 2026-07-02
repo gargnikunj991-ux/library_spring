@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestController;
 import com.nikunj.library.model.Book;
 import com.nikunj.library.service.BookService;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/api/books")
 public class BookController {
@@ -28,7 +30,7 @@ public class BookController {
     }
 
     @PostMapping
-    public Book addBook(@RequestBody Book book) {
+    public Book addBook(@Valid @RequestBody Book book) {
         return bookService.addBook(book);
     }
     @GetMapping("/{id}")
