@@ -8,9 +8,12 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
-@ExceptionHandler(Exception.class)
-public ResponseEntity<String> handleException(Exception ex){
-    
+@ExceptionHandler(BookNotFoundException.class)
+public ResponseEntity<String> handleException(BookNotFoundException ex){
+    return new ResponseEntity<>(
+        "Book Not Found",
+       HttpStatus.NOT_FOUND 
+    );
 }
     
 }
