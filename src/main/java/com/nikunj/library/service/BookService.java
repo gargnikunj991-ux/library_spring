@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.nikunj.library.dto.BookResponse;
 import com.nikunj.library.dto.CreateBookRequest;
 import com.nikunj.library.exception.BookNotFoundException;
 import com.nikunj.library.model.Book;
@@ -16,13 +17,21 @@ public class BookService {
     @Autowired
     private BookRepository bookRepository;
 
-    public Book addBook(CreateBookRequest request) {
+    public BookResponse addBook(CreateBookRequest request) {
 
         Book book = new Book();
         book.setAuthor(request.getAuthor());
         book.setTitle(request.getTitle());
         book.setAvailable(request.isAvailable());
-     return bookRepository.save(book);
+        
+        Book savedBook = bookRepository.save(book);
+        BookResponse response = new BookResponse();
+        response.setId(savedBook.getId());
+        response.setTitle(savedBook.getTitle());
+        response.setAuthor(savedBook.getAuthor());
+        response.setAvailable(savedBook.isAvailable());
+        
+        return response;
 }
     public List<Book> displayBook(){
         return bookRepository.findAll();

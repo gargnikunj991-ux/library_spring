@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.nikunj.library.dto.BookResponse;
 import com.nikunj.library.dto.CreateBookRequest;
 import com.nikunj.library.model.Book;
 import com.nikunj.library.service.BookService;
@@ -31,7 +32,7 @@ public class BookController {
     }
 
     @PostMapping
-    public Book addBook(@Valid @RequestBody  CreateBookRequest request) {
+    public BookResponse addBook(@Valid @RequestBody  CreateBookRequest request) {
         return bookService.addBook(request);
     }
     @GetMapping("/{id}")
