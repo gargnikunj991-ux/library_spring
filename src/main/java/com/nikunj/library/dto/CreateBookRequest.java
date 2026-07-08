@@ -26,7 +26,7 @@ public class CreateBookRequest {
         this.author = author;
     }
 
-    public boolean isAvailable() {
+     public boolean isAvailable() {
         return available;
     }
 
