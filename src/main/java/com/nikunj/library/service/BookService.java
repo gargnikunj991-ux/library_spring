@@ -2,7 +2,6 @@ package com.nikunj.library.service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -13,7 +12,7 @@ import com.nikunj.library.exception.BookNotFoundException;
 import com.nikunj.library.model.Book;
 import com.nikunj.library.repository.BookRepository;
 
-import jakarta.security.auth.message.callback.PrivateKeyCallback;
+
 
 @Service
 public class BookService {
@@ -27,60 +26,47 @@ public class BookService {
         book.setTitle(request.getTitle());
         book.setAvailable(request.isAvailable());
         
-        Book savedBook = bookRepository.save(book);
-        BookResponse response = new BookResponse();
-        response.setId(savedBook.getId());
-        response.setTitle(savedBook.getTitle());
-        response.setAuthor(savedBook.getAuthor());
-        response.setAvailable(savedBook.isAvailable());
-        
-        return response;
+        Book saveBook = bookRepository.save(book);
+
+       return mapToBookResponse(saveBook);
 }
     public List<BookResponse> displayBook(){
 
        List<Book> serachBook = bookRepository.findAll();
        List<BookResponse> responses = new ArrayList<>();
        for(Book book : serachBook){
-        BookResponse response = new BookResponse();
-
-        response.setId(book.getId());
-        response.setTitle(book.getTitle());
-        response.setAuthor(book.getAuthor());
-        response.setAvailable(book.isAvailable());
-
-        responses.add(response);
+        responses.add(mapToBookResponse(book));
        }
        return responses;
     }
 
-    public void deleteBook(Long id){
-        bookRepository.deleteById(id);
-    }
+    public void deleteBook(Long id) {
+     Book book = bookRepository.findById(id).orElseThrow(()-> new BookNotFoundException("Book Not found"));
+       bookRepository.delete(book);
+}
     public BookResponse getBookById(Long id){
         Book book =bookRepository.findById(id).orElseThrow(()-> new BookNotFoundException("Book not found"));
+       return mapToBookResponse(book);
+    }
+    public BookResponse updateBook(Long id ,CreateBookRequest request){
+         Book dbBook = bookRepository.findById(id).orElseThrow(()-> new  BookNotFoundException("Book not found"));
+        
+        dbBook.setTitle(request.getTitle());
+        dbBook.setAuthor(request.getAuthor());
+        dbBook.setAvailable(request.isAvailable());
+        Book book =bookRepository.save(dbBook);
+        
+        return mapToBookResponse(book);
+}
+
+    private BookResponse mapToBookResponse(Book book) {
         BookResponse response = new BookResponse();
         response.setId(book.getId());
         response.setTitle(book.getTitle());
         response.setAuthor(book.getAuthor());
         response.setAvailable(book.isAvailable());
 
-        return response;
+        return response;     
     }
-    public BookResponse updateBook(Long id ,CreateBookRequest request){
-        Optional<Book> existingBook = bookRepository.findById(id);
-        
-        Book dbBook = existingBook.orElseThrow(()-> new BookNotFoundException("Book not found"));
-        dbBook.setTitle(request.getTitle());
-        dbBook.setAuthor(request.getAuthor());
-        dbBook.setAvailable(request.isAvailable());
-        Book updateBook =bookRepository.save(dbBook);
-        
-        BookResponse response = new BookResponse();
-        response.setId(updateBook.getId());
-        response.setTitle(updateBook.getTitle());
-        response.setAuthor(updateBook.getAuthor());
-        response.setAvailable(updateBook.isAvailable());
 
-        return response;
-}
 }

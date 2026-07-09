@@ -14,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nikunj.library.dto.BookResponse;
 import com.nikunj.library.dto.CreateBookRequest;
-import com.nikunj.library.model.Book;
 import com.nikunj.library.service.BookService;
 
 import jakarta.validation.Valid;
@@ -24,27 +23,30 @@ import jakarta.validation.Valid;
 public class BookController {
 
     @Autowired
-    private BookService bookService;   
-   
+    private BookService bookService;
+
     @GetMapping
-    public List<BookResponse> getAllBook(){
+    public List<BookResponse> getAllBook() {
         return bookService.displayBook();
     }
 
     @PostMapping
-    public BookResponse addBook(@Valid @RequestBody  CreateBookRequest request) {
+    public BookResponse addBook(@Valid @RequestBody CreateBookRequest request) {
         return bookService.addBook(request);
     }
+
     @GetMapping("/{id}")
-    public BookResponse getBookId(@PathVariable Long id){
+    public BookResponse getBookId(@PathVariable Long id) {
         return bookService.getBookById(id);
     }
+
     @DeleteMapping("/{id}")
-    public void deleteBookId(@PathVariable Long id){
-         bookService.deleteBook(id);
+    public void deleteBookId(@PathVariable Long id) {
+        bookService.deleteBook(id);
     }
+
     @PutMapping("/{id}")
-    public BookResponse updateBook(@PathVariable Long id ,@Valid @RequestBody CreateBookRequest request){
-         return  bookService.updateBook(id, request);
+    public BookResponse updateBook(@PathVariable Long id, @Valid @RequestBody CreateBookRequest request) {
+        return bookService.updateBook(id, request);
     }
 }
