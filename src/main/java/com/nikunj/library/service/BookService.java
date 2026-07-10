@@ -26,15 +26,15 @@ public class BookService {
         book.setTitle(request.getTitle());
         book.setAvailable(request.isAvailable());
         
-        Book saveBook = bookRepository.save(book);
+        Book savedBook = bookRepository.save(book);
 
-       return mapToBookResponse(saveBook);
+       return mapToBookResponse(savedBook);
 }
     public List<BookResponse> displayBook(){
 
-       List<Book> serachBook = bookRepository.findAll();
+       List<Book> searchBook = bookRepository.findAll();
        List<BookResponse> responses = new ArrayList<>();
-       for(Book book : serachBook){
+       for(Book book : searchBook){
         responses.add(mapToBookResponse(book));
        }
        return responses;
