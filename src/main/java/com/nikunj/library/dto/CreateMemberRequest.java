@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 public class CreateMemberRequest {
     @NotBlank(message="Name is mandary") 
     private String name;
+    @NotBlank(message="Email is mandary")
     @Email(message="Email is must be in a proper format ")  
     private String email;
     @NotBlank(message="PhoneNumber is mandary")

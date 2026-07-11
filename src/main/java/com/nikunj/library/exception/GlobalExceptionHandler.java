@@ -29,5 +29,14 @@ public ResponseEntity<?> handleException(MethodArgumentNotValidException ex){
     }
    return new ResponseEntity<>(messages, HttpStatus.BAD_REQUEST);
 }
+
+@ExceptionHandler(MemberNotFoundException.class)
+public ResponseEntity<String> handleException(MemberNotFoundException ex){
+    return new ResponseEntity<>(
+        "Member Not Found",
+       HttpStatus.NOT_FOUND 
+    );
+}
+
     
 }
