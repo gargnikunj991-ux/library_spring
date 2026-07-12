@@ -7,9 +7,13 @@ import java .util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.nikunj.library.dto.BookResponse;
+import com.nikunj.library.dto.CreateBookRequest;
 import com.nikunj.library.dto.CreateMemberRequest;
 import com.nikunj.library.dto.MemberResponse;
+import com.nikunj.library.exception.BookNotFoundException;
 import com.nikunj.library.exception.MemberNotFoundException;
+import com.nikunj.library.model.Book;
 import  com.nikunj.library.model.Member;
 import  com.nikunj.library.repository.MemberRepository;
 
@@ -40,6 +44,10 @@ public class MemberService {
           Member member =memberRepository.findById(memberId).orElseThrow(()-> new MemberNotFoundException(" Member not found"));
        return mapToMemberResponse(member);
     }
+    public void deleteMember(Long memberId){
+        Member member = memberRepository.findById(memberId).orElseThrow(()-> new MemberNotFoundException("Member not found"));
+        memberRepository.delete(member); 
+    }
 
     private MemberResponse mapToMemberResponse(Member member){
         MemberResponse response = new MemberResponse();
@@ -50,4 +58,14 @@ public class MemberService {
         return response; 
 
     }
+        public MemberResponse updateMember(Long memberId ,CreateMemberRequest request){
+         Member dbMember = memberRepository.findById(memberId).orElseThrow(()-> new  BookNotFoundException("Member not found"));
+        
+        dbMember.setName(request.getName());
+        dbMember.setEmail(request.getEmail());
+        dbMember.setPhoneNumber(request.getPhoneNumber());
+        Member member =memberRepository.save(dbMember);
+        
+        return mapToMemberResponse(member);
+}
 }
