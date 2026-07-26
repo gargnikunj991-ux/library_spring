@@ -59,7 +59,7 @@ public class MemberService {
 
     }
         public MemberResponse updateMember(Long memberId ,CreateMemberRequest request){
-         Member dbMember = memberRepository.findById(memberId).orElseThrow(()-> new  BookNotFoundException("Member not found"));
+         Member dbMember = memberRepository.findById(memberId).orElseThrow(()-> new  MemberNotFoundException("Member not found"));
         
         dbMember.setName(request.getName());
         dbMember.setEmail(request.getEmail());
