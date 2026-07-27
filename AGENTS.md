@@ -37,3 +37,8 @@ Never bypass the service layer.
 2. Explain the problem.
 3. Suggest a solution.
 4. Wait for my approval before changing files.
+
+## Documentation Maintenance Rule
+
+- Every time a change to the codebase is requested, read the project `.md` files (`PROJECT_SUMMARY.md`, `API_DOCUMENTATION.md`, `DATABASE_SCHEMA.md`, `PROJECT_BRAIN.md`).
+- At the end of each session or task, update the project `.md` files to reflect all new/modified endpoints, entities, business logic, and project state so future context is always up to date.

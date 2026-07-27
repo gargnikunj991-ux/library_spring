@@ -33,7 +33,7 @@ public class BorrowResponse {
     return bookTitle;
   }
   public void setBookTitle(String bookTitle){
-    this.bookId = bookId;
+    this.bookTitle = bookTitle;
   }
   public LocalDate getBorrowDate(){
     return borrowDate;
