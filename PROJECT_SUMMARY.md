@@ -56,11 +56,11 @@ com.nikunj.library
 ├── controller/                       # REST Controller Layer
 │   ├── BookController.java           # REST Endpoints for /api/books
 │   ├── MemberController.java         # REST Endpoints for /api/members
-│   └── Borrowcontroller.java         # REST Endpoints for /api/borrow (POST /api/borrow)
+│   └── Borrowcontroller.java         # REST Endpoints for /api/borrow (POST /api/borrow & POST /api/borrow/return/{borrowId})
 ├── service/                          # Business Logic & Service Layer
 │   ├── BookService.java              # Book CRUD logic & DTO mapping
 │   ├── MemberService.java            # Member CRUD logic & DTO mapping
-│   └── BorrowService.java            # Book borrowing & transaction logic
+│   └── BorrowService.java            # Book borrowing & return transaction logic
 ├── repository/                       # Data Access Layer (Spring Data JPA)
 │   ├── BookRepository.java           # JpaRepository<Book, Long>
 │   ├── MemberRepository.java         # JpaRepository<Member, Long>
@@ -80,6 +80,7 @@ com.nikunj.library
     ├── BookNotFoundException.java    # Thrown when Book ID is not found (HTTP 404)
     ├── MemberNotFoundException.java  # Thrown when Member ID is not found (HTTP 404)
     ├── BookUnavailableException.java# Thrown when Book is already borrowed (HTTP 404)
+    ├── BorrowRecordNotFoundException.java # Thrown when Borrow Record ID is not found (HTTP 404)
     └── GlobalExceptionHandler.java   # Centralized @ControllerAdvice handling all exceptions
 ```
 
@@ -94,12 +95,18 @@ com.nikunj.library
    - The system verifies `book.isAvailable()`. If false, `BookUnavailableException` is thrown.
    - Upon successful borrow, `book.setAvailable(false)` is saved, and a `BorrowRecord` is created with a `borrowDate` (today) and `dueDate` (today + 14 days).
 
-2. **DTO Isolation**:
+2. **Book Return (`POST /api/borrow/return/{borrowId}`)**:
+   - When a book is returned via `POST /api/borrow/return/{borrowId}`, `BorrowService.returnBook()` finds the record.
+   - If missing, `BorrowRecordNotFoundException` is thrown.
+   - Sets `returned = true` and `returnDate = LocalDate.now()`.
+   - Resets the associated `Book` entity's `available` flag to `true` (`book.setAvailable(true)`).
+
+3. **DTO Isolation**:
    - Entities (`Book`, `Member`, `BorrowRecord`) are **never** exposed directly to API callers.
    - Controllers accept `@Valid` Request DTOs and return Response DTOs inside `ResponseEntity`.
    - Services perform mapping between Entities and DTOs.
 
-3. **Validation Rules**:
+4. **Validation Rules**:
    - `CreateBookRequest`: `title` (not blank), `author` (not blank).
    - `CreateMemberRequest`: `name` (not blank), `email` (not blank, valid email format), `phoneNumber` (not blank).
    - `CreateBorrowRequest`: `bookId` (not null), `memberId` (not null).
@@ -108,11 +115,12 @@ com.nikunj.library
 
 ## ⚙️ Configuration Summary (`application.properties`)
 
-- **Database URL**: `jdbc:postgresql://localhost:5432/library`
-- **Database Credentials**: Username: `postgres`, Password: `postgres`
+- **Database URL**: `${DB_URL:jdbc:postgresql://localhost:5432/library}` (Supports environment variable override)
+- **Database Credentials**: Username: `${DB_USERNAME:postgres}`, Password: `${DB_PASSWORD:postgres}` (Safe for public GitHub repositories)
 - **DDL Auto**: `update` (Hibernate automatically creates/updates database tables on startup)
 - **SQL Logging**: `spring.jpa.show-sql=true`, `spring.jpa.properties.hibernate.format_sql=true`
 - **Dialect**: `org.hibernate.dialect.PostgreSQLDialect`
+
 
 ---
 

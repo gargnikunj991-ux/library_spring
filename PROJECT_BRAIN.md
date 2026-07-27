@@ -33,6 +33,7 @@ The goal is to master Spring Boot concepts ground-up:
 
 1. **Database & Infrastructure**:
    - [x] PostgreSQL connection (`jdbc:postgresql://localhost:5432/library`)
+   - [x] Environment variables configuration (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD` with default fallbacks) for GitHub security
    - [x] Hibernate DDL auto-update (`update`)
    - [x] Package structuring (`controller`, `service`, `repository`, `model`, `dto`, `exception`)
 
@@ -58,7 +59,7 @@ The goal is to master Spring Boot concepts ground-up:
      - `PUT /api/members/{memberId}`
      - `DELETE /api/members/{memberId}`
 
-4. **Borrow Module** (`/api/borrow`):
+4. **Borrow & Return Module** (`/api/borrow`):
    - [x] `BorrowRecord` entity with `@ManyToOne` relationships (`Book`, `Member`), `borrowDate`, `dueDate`, `returnDate`, `returned`
    - [x] `BorrowRecordRepository` extending `JpaRepository`
    - [x] `BorrowService.borrowBook(...)`:
@@ -67,11 +68,13 @@ The goal is to master Spring Boot concepts ground-up:
      - Automatic 14-day due date calculation
      - Sets `book.setAvailable(false)` and saves record
    - [x] `Borrowcontroller` REST endpoint `POST /api/borrow` calling `BorrowService.borrowBook` returning `ResponseEntity<BorrowResponse>`.
-   - [ ] *Pending*: Implement Return Book feature (`POST /api/borrow/return/{borrowId}`).
+   - [x] `BorrowService.returnBook(...)` & `POST /api/borrow/return/{borrowId}`:
+     - Record lookup validation (`BorrowRecordNotFoundException`)
+     - Sets `returned=true`, `returnDate=now()`, and resets `book.setAvailable(true)`
 
 5. **Validation & Exception Handling**:
    - [x] Input validation annotations (`@NotBlank`, `@Email`, `@NotNull`, `@Valid`)
-   - [x] Custom exceptions: `BookNotFoundException`, `MemberNotFoundException`, `BookUnavailableException`
+   - [x] Custom exceptions: `BookNotFoundException`, `MemberNotFoundException`, `BookUnavailableException`, `BorrowRecordNotFoundException`
    - [x] Centralized `@ControllerAdvice` in `GlobalExceptionHandler`
 
 ---
@@ -87,14 +90,12 @@ The goal is to master Spring Boot concepts ground-up:
 
 ## 🚀 5. Next Steps & Roadmap
 
-1. **Return Book Module**:
-   - Implement Return Book logic: `POST /api/borrow/return/{borrowId}` (sets `returned=true`, sets `returnDate=now()`, resets `book.setAvailable(true)`).
-
-2. **Advanced Book Operations**:
+1. **Advanced Book Operations**:
    - Search books by title / author / category.
    - Pagination and Sorting support (`Pageable`).
 
-3. **Security & Authentication (Future)**:
+2. **Security & Authentication (Post-Hackathon)**:
    - Spring Security setup.
    - User roles (Librarian, Member).
    - JWT authentication.
+

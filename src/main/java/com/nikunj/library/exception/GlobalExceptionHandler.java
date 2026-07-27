@@ -47,5 +47,13 @@ public ResponseEntity<String> handleException(BookUnavailableException ex){
     );
 }
 
-    
+@ExceptionHandler(BorrowRecordNotFoundException.class)
+public ResponseEntity<String> handleException(BorrowRecordNotFoundException ex){
+    return new ResponseEntity<>(
+        "Borrow Record Not Found",
+       HttpStatus.NOT_FOUND 
+    );
 }
+
+}
+

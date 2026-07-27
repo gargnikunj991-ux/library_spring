@@ -241,6 +241,37 @@ Base Path: `/api/borrow`
 
 ---
 
+### 🔹 3.2 Return a Book
+- **HTTP Method**: `POST`
+- **Path**: `/api/borrow/return/{borrowId}`
+- **Description**: Marks a borrowed book as returned and sets the book availability back to `true`.
+- **Path Variable**: `borrowId` (Long) - ID of the borrow record
+- **Business Behavior**:
+  1. Finds `BorrowRecord` by `borrowId` (throws `BorrowRecordNotFoundException` if missing).
+  2. If not already returned:
+     - Sets `returned` = `true`.
+     - Sets `returnDate` = today (`LocalDate.now()`).
+     - Resets associated `book.setAvailable(true)` and saves `Book`.
+     - Saves `BorrowRecord`.
+  3. Returns updated `BorrowResponse`.
+- **Response**:
+  - `200 OK` returning `BorrowResponse`.
+  - `404 Not Found` if borrow record ID does not exist (`"Borrow Record Not Found"`).
+- **Sample Response Body (`200 OK`)**:
+```json
+{
+  "borrowId": 1,
+  "bookId": 1,
+  "memberName": "John Doe",
+  "bookTitle": "Clean Code",
+  "borrowDate": "2026-07-27",
+  "dueDate": "2026-08-10",
+  "returned": true
+}
+```
+
+---
+
 ## ⚠️ 4. Global Error Handling & HTTP Status Codes
 
 Centralized in `GlobalExceptionHandler.java`:
@@ -250,4 +281,5 @@ Centralized in `GlobalExceptionHandler.java`:
 | `BookNotFoundException` | `404 NOT_FOUND` | `"Book Not Found"` |
 | `MemberNotFoundException` | `404 NOT_FOUND` | `"Member Not Found"` |
 | `BookUnavailableException` | `404 NOT_FOUND` | `"Book Not available"` |
+| `BorrowRecordNotFoundException` | `404 NOT_FOUND` | `"Borrow Record Not Found"` |
 | `MethodArgumentNotValidException` | `400 BAD_REQUEST` | `["Error message 1", "Error message 2"]` |

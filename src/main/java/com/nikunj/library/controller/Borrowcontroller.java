@@ -2,6 +2,7 @@ package com.nikunj.library.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -25,4 +26,11 @@ public class Borrowcontroller {
         BorrowResponse response = borrowService.borrowBook(request);
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/return/{borrowId}")
+    public ResponseEntity<BorrowResponse> returnBook(@PathVariable Long borrowId) {
+        BorrowResponse response = borrowService.returnBook(borrowId);
+        return ResponseEntity.ok(response);
+    }
 }
+

@@ -9,6 +9,7 @@ import com.nikunj.library.dto.BorrowResponse;
 import com.nikunj.library.dto.CreateBorrowRequest;
 import com.nikunj.library.exception.BookNotFoundException;
 import com.nikunj.library.exception.BookUnavailableException;
+import com.nikunj.library.exception.BorrowRecordNotFoundException;
 import com.nikunj.library.exception.MemberNotFoundException;
 import com.nikunj.library.model.Book;
 import com.nikunj.library.model.BorrowRecord;
@@ -77,4 +78,34 @@ public class BorrowService {
 
         return response;
     }
+
+    public BorrowResponse returnBook(Long borrowId) {
+        BorrowRecord borrowRecord = borrowRecordRepository.findById(borrowId)
+                .orElseThrow(() -> new BorrowRecordNotFoundException("Borrow record not found"));
+
+        if (!borrowRecord.isReturned()) {
+            borrowRecord.setReturned(true);
+            borrowRecord.setReturnDate(LocalDate.now());
+
+            Book book = borrowRecord.getBook();
+            if (book != null) {
+                book.setAvailable(true);
+                bookRepository.save(book);
+            }
+
+            borrowRecordRepository.save(borrowRecord);
+        }
+
+        BorrowResponse response = new BorrowResponse();
+        response.setBorrowId(borrowRecord.getBorrowId());
+        response.setBookId(borrowRecord.getBook() != null ? borrowRecord.getBook().getId() : null);
+        response.setMemberName(borrowRecord.getMember() != null ? borrowRecord.getMember().getName() : null);
+        response.setBookTitle(borrowRecord.getBook() != null ? borrowRecord.getBook().getTitle() : null);
+        response.setBorrowDate(borrowRecord.getBorrowDate());
+        response.setDueDate(borrowRecord.getDueDate());
+        response.setReturned(borrowRecord.isReturned());
+
+        return response;
+    }
 }
+
