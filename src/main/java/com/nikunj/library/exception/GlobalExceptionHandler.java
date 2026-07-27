@@ -1,12 +1,13 @@
 package com.nikunj.library.exception;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
-import java.util.List;
-import java.util.ArrayList;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
 @ControllerAdvice
@@ -34,6 +35,14 @@ public ResponseEntity<?> handleException(MethodArgumentNotValidException ex){
 public ResponseEntity<String> handleException(MemberNotFoundException ex){
     return new ResponseEntity<>(
         "Member Not Found",
+       HttpStatus.NOT_FOUND 
+    );
+}
+
+@ExceptionHandler(BookUnavailableException.class)
+public ResponseEntity<String> handleException(BookUnavailableException ex){
+    return new ResponseEntity<>(
+        "Book Not available",
        HttpStatus.NOT_FOUND 
     );
 }
