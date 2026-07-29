@@ -126,112 +126,122 @@ Implemented APIs
 # Current Folder Structure
 
 ```
+config/
+    SecurityConfig
+
 controller/
     BookController
+    MemberController
+    Borrowcontroller
 
 service/
     BookService
+    MemberService
+    BorrowService
 
 repository/
     BookRepository
+    MemberRepository
+    BorrowRecordRepository
 
 model/
     Book
+    Member
+    BorrowRecord
+    User
+
+dto/
+    CreateBookRequest
+    BookResponse
+    CreateMemberRequest
+    MemberResponse
+    CreateBorrowRequest
+    BorrowResponse
+
+exception/
+    BookNotFoundException
+    MemberNotFoundException
+    BookUnavailableException
+    BorrowRecordNotFoundException
+    GlobalExceptionHandler
 ```
 
 ---
 
-# Next Features
+# Completed Features
 
 ## Book Module
 
-* [ ] PUT /api/books/{id}
-* [ ] Search Book
-* [ ] Validation
-* [ ] Exception Handling
-* [ ] DTO
+* [x] PUT /api/books/{id}
+* [x] GET /api/books
+* [x] GET /api/books/{id}
+* [x] POST /api/books
+* [x] DELETE /api/books/{id}
+* [x] Validation
+* [x] Exception Handling
+* [x] DTO Isolation
 
 ---
 
 ## Member Module
 
-* [ ] Member Entity
-* [ ] Repository
-* [ ] Service
-* [ ] Controller
-* [ ] CRUD APIs
+* [x] Member Entity
+* [x] Repository
+* [x] Service
+* [x] Controller
+* [x] CRUD APIs
 
 ---
 
 ## Borrow Module
 
-* [ ] Borrow Book
-* [ ] Return Book
-* [ ] Borrow History
-* [ ] Due Date
-* [ ] Fine Calculation
+* [x] Borrow Book (`POST /api/borrow`)
+* [x] Return Book (`POST /api/borrow/return/{borrowId}`)
+* [x] Due Date Calculation (14 Days)
+* [x] Book Availability State Synchronization
+
+---
+
+## Security & Validation & Exception Handling
+
+* [x] Spring Security filter chain (`SecurityConfig`)
+* [x] User Entity (`users` table) with Role enum
+* [x] `@Valid`, `@NotBlank`, `@Email`, `@NotNull`
+* [x] `@ControllerAdvice` in `GlobalExceptionHandler`
+* [x] Custom exceptions
 
 ---
 
 # Future Features
 
-## Authentication
+## Authentication & Security
 
-* [ ] User Login
 * [ ] JWT Authentication
-* [ ] Password Encryption
-* [ ] Roles
-
-  * Admin
-  * Librarian
+* [ ] Password Encryption (BCrypt)
+* [ ] Fine-grained Role-Based Access Control (Admin / Librarian / Member)
 
 ---
 
-## Validation
+## Database & Querying
 
-* [ ] @Valid
-* [ ] @NotBlank
-* [ ] @Email
-* [ ] Custom Validation
-
----
-
-## Exception Handling
-
-* [ ] Global Exception Handler
-* [ ] Custom Exceptions
-* [ ] Proper Error Responses
-
----
-
-## Database
-
-* [ ] OneToMany
-* [ ] ManyToOne
-* [ ] ManyToMany
-* [ ] Cascade Types
-* [ ] Fetch Types
+* [ ] Pagination & Sorting (`Pageable`)
+* [ ] Book Search API (by title, author, category)
+* [ ] `@ManyToMany` / `@OneToMany` cascade mappings
 
 ---
 
 ## Documentation
 
-* [ ] Swagger / OpenAPI
+* [ ] Swagger / OpenAPI Integration
 
 ---
 
-## Testing
+## Testing & Deployment
 
-* [ ] Unit Testing
-* [ ] Integration Testing
+* [ ] Unit Testing & Integration Testing
+* [ ] Dockerization
+* [ ] Production Deployment (Railway / Render)
 
----
-
-## Deployment
-
-* [ ] Docker
-* [ ] Railway / Render
-* [ ] PostgreSQL Production Database
 
 ---
 

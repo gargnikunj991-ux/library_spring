@@ -4,6 +4,15 @@ This document outlines all RESTful API endpoints, request payloads, response for
 
 ---
 
+## 🔒 Security & Authentication
+
+Spring Security (`SecurityConfig.java`) is enabled across all API endpoints:
+- **CSRF**: Disabled (`csrf.disable()`)
+- **Authentication**: Required (`.anyRequest().authenticated()`)
+- **Authorization**: Credentials must be supplied via HTTP Authentication for protected endpoints.
+
+---
+
 ## 📚 1. Book API Endpoints (`/api/books`)
 
 Base Path: `/api/books`

@@ -77,6 +77,11 @@ The goal is to master Spring Boot concepts ground-up:
    - [x] Custom exceptions: `BookNotFoundException`, `MemberNotFoundException`, `BookUnavailableException`, `BorrowRecordNotFoundException`
    - [x] Centralized `@ControllerAdvice` in `GlobalExceptionHandler`
 
+6. **Security & User Model**:
+   - [x] `spring-boot-starter-security` added to build dependencies
+   - [x] `SecurityConfig.java` enforcing request authentication and disabling CSRF
+   - [x] `User` entity mapped to `users` database table with `username`, `password`, and `Role.ADMIN` enum
+
 ---
 
 ## 📑 4. Quick Documentation Index
@@ -90,12 +95,13 @@ The goal is to master Spring Boot concepts ground-up:
 
 ## 🚀 5. Next Steps & Roadmap
 
-1. **Advanced Book Operations**:
+1. **Advanced Book & Member Operations**:
    - Search books by title / author / category.
    - Pagination and Sorting support (`Pageable`).
 
-2. **Security & Authentication (Post-Hackathon)**:
-   - Spring Security setup.
-   - User roles (Librarian, Member).
-   - JWT authentication.
+2. **Advanced Authentication & JWT Authorization**:
+   - Custom UserDetailsService implementation.
+   - JWT token authentication filter & login endpoint.
+   - Fine-grained role-based access control (Librarian vs Member).
+
 

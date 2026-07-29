@@ -57,14 +57,23 @@ Project Structure
 src
 └── main
     ├── java
-    │   └── com.librarymanagement
+    │   └── com.nikunj.library
+    │       ├── config
+    │       │   └── SecurityConfig.java
     │       ├── controller
+    │       │   ├── BookController.java
+    │       │   ├── MemberController.java
+    │       │   └── Borrowcontroller.java
     │       ├── dto
     │       ├── exception
     │       ├── model
+    │       │   ├── Book.java
+    │       │   ├── Member.java
+    │       │   ├── BorrowRecord.java
+    │       │   └── User.java
     │       ├── repository
     │       ├── service
-    │       └── LibraryManagementApplication.java
+    │       └── LibraryApplication.java
     │
     └── resources
         └── application.properties

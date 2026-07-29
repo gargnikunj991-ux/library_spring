@@ -39,6 +39,7 @@ Centralized Exception Handling is managed across all controllers using `@Control
 - **Language**: Java 21
 - **Framework**: Spring Boot 4.1.0
 - **Web**: Spring MVC (`spring-boot-starter-webmvc`)
+- **Security**: Spring Security (`spring-boot-starter-security`)
 - **Data Persistence**: Spring Data JPA (`spring-boot-starter-data-jpa`), Hibernate
 - **Database**: PostgreSQL (Driver: `org.postgresql.Driver`)
 - **Validation**: Jakarta Validation (`spring-boot-starter-validation`)
@@ -53,6 +54,8 @@ Base package: `com.nikunj.library`
 ```
 com.nikunj.library
 ├── LibraryApplication.java           # Main Spring Boot Application Entry Point
+├── config/                           # Security & Application Configuration
+│   └── SecurityConfig.java           # Spring Security filter chain setup
 ├── controller/                       # REST Controller Layer
 │   ├── BookController.java           # REST Endpoints for /api/books
 │   ├── MemberController.java         # REST Endpoints for /api/members
@@ -68,7 +71,8 @@ com.nikunj.library
 ├── model/                            # JPA Database Entities
 │   ├── Book.java                     # "books" table entity
 │   ├── Member.java                   # "members" table entity
-│   └── BorrowRecord.java             # "borrow_records" table entity with Foreign Keys
+│   ├── BorrowRecord.java             # "borrow_records" table entity with Foreign Keys
+│   └── User.java                     # "users" table entity for authentication (Role.ADMIN)
 ├── dto/                              # Data Transfer Objects (API Contracts)
 │   ├── CreateBookRequest.java        # Inbound DTO for creating/updating Books
 │   ├── BookResponse.java             # Outbound DTO for Book responses
@@ -101,12 +105,16 @@ com.nikunj.library
    - Sets `returned = true` and `returnDate = LocalDate.now()`.
    - Resets the associated `Book` entity's `available` flag to `true` (`book.setAvailable(true)`).
 
-3. **DTO Isolation**:
-   - Entities (`Book`, `Member`, `BorrowRecord`) are **never** exposed directly to API callers.
+3. **Security & Authentication**:
+   - `SecurityConfig` configures `SecurityFilterChain` to disable CSRF and enforce authentication on incoming endpoints (`.anyRequest().authenticated()`).
+   - `User` entity maps to the `users` table with fields `id`, `username` (unique, non-null), `password`, and `role` (`EnumType.STRING` with enum `Role.ADMIN`).
+
+4. **DTO Isolation**:
+   - Entities (`Book`, `Member`, `BorrowRecord`, `User`) are **never** exposed directly to API callers.
    - Controllers accept `@Valid` Request DTOs and return Response DTOs inside `ResponseEntity`.
    - Services perform mapping between Entities and DTOs.
 
-4. **Validation Rules**:
+5. **Validation Rules**:
    - `CreateBookRequest`: `title` (not blank), `author` (not blank).
    - `CreateMemberRequest`: `name` (not blank), `email` (not blank, valid email format), `phoneNumber` (not blank).
    - `CreateBorrowRequest`: `bookId` (not null), `memberId` (not null).
