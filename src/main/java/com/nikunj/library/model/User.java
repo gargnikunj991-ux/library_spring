@@ -1,14 +1,11 @@
 package com.nikunj.library.model;
 
-import jakarta.persistence.Table;
-import jakarta.persistence.Id;
+import java.util.Collection;
+import java.util.List;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
-
-import java.util.List;
-import java.util.Collection;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -16,6 +13,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 
 @Entity
@@ -56,7 +55,6 @@ public String getPassword() {
 public String getUsername() {
     return username;
 }
-
 @Override
 public boolean isAccountNonExpired() {
     return true;
@@ -75,6 +73,18 @@ public boolean isCredentialsNonExpired() {
 @Override
 public boolean isEnabled() {
     return true;
+}
+
+public void setUsername(String username) {
+    this.username = username;
+}
+
+public void setPassword(String password) {
+    this.password = password;
+}
+
+public void setRole(Role role) {
+    this.role = role;
 }
 
 }

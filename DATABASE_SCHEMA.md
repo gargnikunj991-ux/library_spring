@@ -139,13 +139,13 @@ Mapped to Entity: `com.nikunj.library.model.User`
 | `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique user identifier |
 | `username` | `VARCHAR(255)` | `@Column(nullable = false, unique = true)` | UNIQUE, NOT NULL | User login username |
 | `password` | `VARCHAR(255)` | `@Column(nullable = false)` | NOT NULL | Hashed / User password |
-| `role` | `VARCHAR(255)` | `@Enumerated(EnumType.STRING) @Column(nullable = false)` | NOT NULL | User Role (`ADMIN`) |
+| `role` | `VARCHAR(255)` | `@Enumerated(EnumType.STRING) @Column(nullable = false)` | NOT NULL | User Role (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) |
 
 **JPA Mapping (`User.java`)**:
 ```java
 @Entity
 @Table(name = "users")
-public class User {
+public class User implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -161,8 +161,14 @@ public class User {
     private Role role;
 
     public enum Role {
-        ADMIN
+        ADMIN,
+        LIBRARIAN,
+        ASSISTANT
     }
+
+    public void setUsername(String username) { this.username = username; }
+    public void setPassword(String password) { this.password = password; }
+    public void setRole(Role role) { this.role = role; }
 }
 ```
 

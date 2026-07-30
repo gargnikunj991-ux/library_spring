@@ -80,7 +80,10 @@ The goal is to master Spring Boot concepts ground-up:
 6. **Security & User Model**:
    - [x] `spring-boot-starter-security` added to build dependencies
    - [x] `SecurityConfig.java` enforcing request authentication and disabling CSRF
-   - [x] `User` entity mapped to `users` database table with `username`, `password`, and `Role.ADMIN` enum
+   - [x] `User` entity mapped to `users` database table with `username`, `password`, and `Role` (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) with setters (`setUsername`, `setPassword`, `setRole`)
+   - [x] `AuthService.registerUser(RegisterRequest request)` implemented with `PasswordEncoder` hashing and database persistence via `UserRepository`
+   - [x] `CustomUserDetailsService.loadUserByUsername()` implemented — queries `UserRepository.findByUsername()` and throws `UsernameNotFoundException` if user not found
+   - [x] JWT login endpoint (`POST /auth/login`) fully functional — authenticates via `AuthenticationManager`, generates JWT token via `JwtService`
 
 ---
 
@@ -100,8 +103,7 @@ The goal is to master Spring Boot concepts ground-up:
    - Pagination and Sorting support (`Pageable`).
 
 2. **Advanced Authentication & JWT Authorization**:
-   - Custom UserDetailsService implementation.
-   - JWT token authentication filter & login endpoint.
+   - JWT token authentication filter (validate token on protected endpoints).
    - Fine-grained role-based access control (Librarian vs Member).
 
 

@@ -57,29 +57,37 @@ com.nikunj.library
 ├── config/                           # Security & Application Configuration
 │   └── SecurityConfig.java           # Spring Security filter chain setup
 ├── controller/                       # REST Controller Layer
+│   ├── AuthController.java           # REST Endpoints for /auth (login & register integration)
 │   ├── BookController.java           # REST Endpoints for /api/books
 │   ├── MemberController.java         # REST Endpoints for /api/members
 │   └── Borrowcontroller.java         # REST Endpoints for /api/borrow (POST /api/borrow & POST /api/borrow/return/{borrowId})
 ├── service/                          # Business Logic & Service Layer
+│   ├── AuthService.java              # User registration logic with PasswordEncoder & login support
 │   ├── BookService.java              # Book CRUD logic & DTO mapping
-│   ├── MemberService.java            # Member CRUD logic & DTO mapping
-│   └── BorrowService.java            # Book borrowing & return transaction logic
+│   ├── BorrowService.java            # Book borrowing & return transaction logic
+│   ├── CustomUserDetailsService.java# Spring Security UserDetailsService implementation
+│   ├── JwtService.java               # JWT token generation and validation service
+│   └── MemberService.java            # Member CRUD logic & DTO mapping
 ├── repository/                       # Data Access Layer (Spring Data JPA)
 │   ├── BookRepository.java           # JpaRepository<Book, Long>
+│   ├── BorrowRecordRepository.java   # JpaRepository<BorrowRecord, Long>
 │   ├── MemberRepository.java         # JpaRepository<Member, Long>
-│   └── BorrowRecordRepository.java   # JpaRepository<BorrowRecord, Long>
+│   └── UserRepository.java           # JpaRepository<User, Long>
 ├── model/                            # JPA Database Entities
 │   ├── Book.java                     # "books" table entity
 │   ├── Member.java                   # "members" table entity
 │   ├── BorrowRecord.java             # "borrow_records" table entity with Foreign Keys
-│   └── User.java                     # "users" table entity for authentication (Role.ADMIN)
+│   └── User.java                     # "users" table entity for authentication (Role: ADMIN, LIBRARIAN, ASSISTANT)
 ├── dto/                              # Data Transfer Objects (API Contracts)
-│   ├── CreateBookRequest.java        # Inbound DTO for creating/updating Books
 │   ├── BookResponse.java             # Outbound DTO for Book responses
-│   ├── CreateMemberRequest.java      # Inbound DTO for creating/updating Members
-│   ├── MemberResponse.java           # Outbound DTO for Member responses
+│   ├── BorrowResponse.java           # Outbound DTO for borrow transactions
+│   ├── CreateBookRequest.java        # Inbound DTO for creating/updating Books
 │   ├── CreateBorrowRequest.java      # Inbound DTO for borrowing a book
-│   └── BorrowResponse.java           # Outbound DTO for borrow transactions
+│   ├── CreateMemberRequest.java      # Inbound DTO for creating/updating Members
+│   ├── LoginRequest.java             # Inbound DTO for authentication
+│   ├── LoginResponse.java            # Outbound DTO containing JWT token
+│   ├── MemberResponse.java           # Outbound DTO for Member responses
+│   └── RegisterRequest.java          # Inbound DTO for user registration
 └── exception/                        # Custom Exceptions & Global Handler
     ├── BookNotFoundException.java    # Thrown when Book ID is not found (HTTP 404)
     ├── MemberNotFoundException.java  # Thrown when Member ID is not found (HTTP 404)
@@ -105,9 +113,14 @@ com.nikunj.library
    - Sets `returned = true` and `returnDate = LocalDate.now()`.
    - Resets the associated `Book` entity's `available` flag to `true` (`book.setAvailable(true)`).
 
-3. **Security & Authentication**:
+3. **Security & User Registration**:
    - `SecurityConfig` configures `SecurityFilterChain` to disable CSRF and enforce authentication on incoming endpoints (`.anyRequest().authenticated()`).
-   - `User` entity maps to the `users` table with fields `id`, `username` (unique, non-null), `password`, and `role` (`EnumType.STRING` with enum `Role.ADMIN`).
+   - `User` entity maps to the `users` table with fields `id`, `username` (unique, non-null), `password`, and `role` (`EnumType.STRING` with roles `ADMIN`, `LIBRARIAN`, `ASSISTANT`).
+   - `AuthService.registerUser(RegisterRequest request)` handles user registration:
+     - Instantiates a new `User` entity.
+     - Sets username and role from `RegisterRequest`.
+     - Encodes the raw password using `PasswordEncoder.encode(...)` before storing.
+     - Saves user to PostgreSQL via `UserRepository.save(...)`.
 
 4. **DTO Isolation**:
    - Entities (`Book`, `Member`, `BorrowRecord`, `User`) are **never** exposed directly to API callers.

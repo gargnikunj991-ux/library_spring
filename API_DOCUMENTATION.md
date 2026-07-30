@@ -11,6 +11,22 @@ Spring Security (`SecurityConfig.java`) is enabled across all API endpoints:
 - **Authentication**: Required (`.anyRequest().authenticated()`)
 - **Authorization**: Credentials must be supplied via HTTP Authentication for protected endpoints.
 
+### 🔑 Authentication Service & User Registration (`AuthService`)
+- **Registration Method**: `registerUser(RegisterRequest request)`
+- **Request DTO**: `RegisterRequest`
+  ```json
+  {
+    "username": "johndoe",
+    "password": "secretpassword",
+    "role": "ADMIN" // Roles available: ADMIN, LIBRARIAN, ASSISTANT
+  }
+  ```
+- **Validation Rules**:
+  - `username`: `@NotBlank(message = "Username is mandatory")`
+  - `password`: `@NotBlank(message = "Password is mandatory")`
+  - `role`: `@NotNull(message = "Role is mandatory")`
+- **Security Behavior**: Password is BCrypt-encoded using `PasswordEncoder.encode()` before persisting into the PostgreSQL `users` table.
+
 ---
 
 ## 📚 1. Book API Endpoints (`/api/books`)
