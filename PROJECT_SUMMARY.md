@@ -142,6 +142,8 @@ com.nikunj.library
 - **DDL Auto**: `update` (Hibernate automatically creates/updates database tables on startup)
 - **SQL Logging**: `spring.jpa.show-sql=true`, `spring.jpa.properties.hibernate.format_sql=true`
 - **Dialect**: `org.hibernate.dialect.PostgreSQLDialect`
+- **JWT Secret**: `${JWT_SECRET:...}` (Injected dynamically via `@Value("${jwt.secret}")` in `JwtService`)
+- **Error Stack Trace**: `server.error.include-stacktrace=never` (Prevents exposing Java stack traces in HTTP responses)
 
 
 ---

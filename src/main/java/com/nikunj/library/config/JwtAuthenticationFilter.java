@@ -1,5 +1,7 @@
 package com.nikunj.library.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -15,35 +17,35 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
-public class JwtAuthenticationFilter extends OncePerRequestFilter{
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtService jwtService;
-private final CustomUserDetailsService userDetailsService;
+    private final CustomUserDetailsService userDetailsService;
 
-public JwtAuthenticationFilter(
-        JwtService jwtService,
-        CustomUserDetailsService userDetailsService) {
+    public JwtAuthenticationFilter(
+            JwtService jwtService,
+            CustomUserDetailsService userDetailsService) {
 
-    this.jwtService = jwtService;
-    this.userDetailsService = userDetailsService;
-}
+        this.jwtService = jwtService;
+        this.userDetailsService = userDetailsService;
+    }
 
-@Override
-protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain filterChain)
-    throws ServletException, IOException {
-        System.out.println("JWT FILTER RUNNING");
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+
         final String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            System.out.println("No Bearer token found in request");
+            log.trace("No Bearer token found in request headers");
             filterChain.doFilter(request, response);
             return;
         }
 
         try {
             final String jwt = authHeader.substring(7).trim();
-            System.out.println("JWT token found, extracting username...");
             final String username = jwtService.extractUsername(jwt);
-            System.out.println("Extracted username: " + username);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
@@ -55,15 +57,15 @@ protected void doFilterInternal(HttpServletRequest request,HttpServletResponse r
                                     userDetails.getAuthorities()
                             );
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    System.out.println("Authentication set successfully for user: " + username);
+                    log.debug("Authentication set successfully for user: {}", username);
                 } else {
-                    System.out.println("Token validation failed for user: " + username);
+                    log.warn("Token validation failed for user: {}", username);
                 }
             }
         } catch (Exception e) {
-            System.out.println("JWT processing error: " + e.getMessage());
+            log.error("JWT processing error: {}", e.getMessage());
         }
 
         filterChain.doFilter(request, response);
-}
+    }
 }

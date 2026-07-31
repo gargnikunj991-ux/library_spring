@@ -1,200 +1,166 @@
-Library Management System
+# 📚 Library Management System Backend
 
-BACKEND • SPRING BOOT • POSTGRESQL
+> A production-grade RESTful Library Management System backend built with **Java 21**, **Spring Boot 4.1.0**, **Spring Data JPA**, **Spring Security with JWT**, and **PostgreSQL**.
 
-Developed a RESTful Library Management System backend using Java, Spring Boot, Spring Data JPA, Hibernate, and PostgreSQL. Built a scalable backend with 10 REST API endpoints for managing books, members, borrowing, and returning books. Implemented layered architecture (Controller → Service → Repository), DTO-based request/response handling, input validation, global exception handling, and custom exceptions. Designed a relational database with 4 interconnected tables and implemented business workflows that automatically track book availability, borrow dates, due dates, and return dates. Used Git and GitHub for version control throughout development.
+---
 
-Suggested Technology Tags
-Java
-Spring Boot
-Spring Data JPA
-Hibernate
-PostgreSQL
-REST APIs
+## 🎯 Overview
 
-or, if your UI only allows six tags:
+The Library Management System provides a clean, layered backend architecture (`Controller` → `Service` → `Repository`) for managing books, library members, user registration/authentication, borrowing, and returning books.
 
-Java
-Spring Boot
-PostgreSQL
-Hibernate
-REST APIs
-JPA
+Key Highlights:
+- **Clean Architecture & Isolation**: Entities are never exposed directly; all API communication uses validated DTOs.
+- **Security & Stateless JWT Auth**: Protected REST endpoints using Spring Security and stateless JWT authentication filter.
+- **Atomic Transactions**: Book borrowing and returning workflows managed with `@Transactional` guarantees.
+- **Robust Exception Handling**: Global exception handling via `@ControllerAdvice` and sanitized HTTP error responses (`server.error.include-stacktrace=never`).
 
-If you want something that looks even more like a professional portfolio (similar to what senior backend developers use), I'd write it like this:
+---
 
-Developed a production-style RESTful Library Management System backend using Java, Spring Boot, Spring Data JPA, Hibernate, and PostgreSQL. Designed and implemented 10 REST API endpoints for book, member, borrow, and return management with layered architecture, DTOs, validation, custom exception handling, and JPA entity relationships. Built a relational database with 4 interconnected tables and implemented complete borrowing workflows while using Git and GitHub for version control.
+## 🛠️ Tech Stack & Dependencies
 
-now i want you to give me a readme.md for my new project 
-Library Management System
+| Layer / Component | Technology |
+|---|---|
+| **Language** | Java 21 |
+| **Framework** | Spring Boot 4.1.0 |
+| **Security** | Spring Security, JJWT (`io.jsonwebtoken` 0.12.7) |
+| **ORM / Data Persistence** | Spring Data JPA, Hibernate ORM |
+| **Database** | PostgreSQL |
+| **Validation** | Jakarta Validation (`spring-boot-starter-validation`) |
+| **Build Tool** | Maven |
+| **Logging** | SLF4J / Logback |
 
-A RESTful Library Management System built using Java, Spring Boot, Spring Data JPA, Hibernate, and PostgreSQL. The project provides APIs to manage books, library members, borrowing, and returning books while following a clean layered architecture.
+---
 
-Features
-Book Management (Create, Read, Update, Delete)
-Member Management (Create, Read, Update, Delete)
-Borrow Book
-Return Book
-Automatic Book Availability Management
-Input Validation using Jakarta Validation
-Global Exception Handling
-Custom Exceptions
-DTO-based Request and Response Models
-Layered Architecture (Controller → Service → Repository)
-PostgreSQL Database Integration
-Spring Data JPA & Hibernate ORM
-Tech Stack
-Technology	Purpose
-Java 21	Programming Language
-Spring Boot	Backend Framework
-Spring Data JPA	Database Access
-Hibernate	ORM
-PostgreSQL	Database
-Maven	Dependency Management
-Git & GitHub	Version Control
-Thunder Client / Postman	API Testing
-Project Structure
-src
-└── main
-    ├── java
-    │   └── com.nikunj.library
-    │       ├── config
-    │       │   └── SecurityConfig.java
-    │       ├── controller
-    │       │   ├── BookController.java
-    │       │   ├── MemberController.java
-    │       │   └── Borrowcontroller.java
-    │       ├── dto
-    │       ├── exception
-    │       ├── model
-    │       │   ├── Book.java
-    │       │   ├── Member.java
-    │       │   ├── BorrowRecord.java
-    │       │   └── User.java
-    │       ├── repository
-    │       ├── service
-    │       └── LibraryApplication.java
-    │
-    └── resources
-        └── application.properties
-Database Schema
+## 📂 Project Structure
 
-The application uses 4 relational tables:
+```
+com.nikunj.library
+├── LibraryApplication.java           # Main Spring Boot Application Entry Point
+├── config/                           # Security & Application Configuration
+│   ├── SecurityConfig.java           # Spring Security filter chain setup
+│   └── JwtAuthenticationFilter.java  # Custom JWT filter (OncePerRequestFilter with SLF4J logging)
+├── controller/                       # REST Controller Layer
+│   ├── AuthController.java           # Endpoints for /auth/register & /auth/login
+│   ├── BookController.java           # Endpoints for /api/books
+│   ├── MemberController.java         # Endpoints for /api/members
+│   └── Borrowcontroller.java         # Endpoints for /api/borrow
+├── service/                          # Business Logic & Service Layer
+│   ├── AuthService.java              # Registration logic with PasswordEncoder & login support
+│   ├── BookService.java              # Book CRUD logic & DTO mapping
+│   ├── BorrowService.java            # Borrow & Return transactional workflows (@Transactional)
+│   ├── CustomUserDetailsService.java# UserDetailsService implementation for Spring Security
+│   ├── JwtService.java               # JWT generation & validation (@Value("${jwt.secret}"))
+│   └── MemberService.java            # Member CRUD logic & DTO mapping
+├── repository/                       # Data Access Layer (Spring Data JPA)
+│   ├── BookRepository.java           # JpaRepository<Book, Long>
+│   ├── BorrowRecordRepository.java   # JpaRepository<BorrowRecord, Long>
+│   ├── MemberRepository.java         # JpaRepository<Member, Long>
+│   └── UserRepository.java           # JpaRepository<User, Long>
+├── model/                            # JPA Database Entities
+│   ├── Book.java                     # "books" table entity
+│   ├── Member.java                   # "members" table entity
+│   ├── BorrowRecord.java             # "borrow_records" table entity
+│   └── User.java                     # "users" table entity (ADMIN, LIBRARIAN, ASSISTANT)
+├── dto/                              # Data Transfer Objects
+│   ├── BookResponse.java
+│   ├── BorrowResponse.java
+│   ├── CreateBookRequest.java
+│   ├── CreateBorrowRequest.java
+│   ├── CreateMemberRequest.java
+│   ├── LoginRequest.java
+│   ├── LoginResponse.java
+│   ├── MemberResponse.java
+│   └── RegisterRequest.java
+└── exception/                        # Custom Exception Handling
+    ├── BookNotFoundException.java
+    ├── BookUnavailableException.java
+    ├── BorrowRecordNotFoundException.java
+    ├── MemberNotFoundException.java
+    └── GlobalExceptionHandler.java   # Centralized @ControllerAdvice
+```
 
-Users
-Members
-Books
-Borrow Records
-Relationships
-Member
-   │
-   │ 1
-   │
-   ├───────────────┐
-                   │
-                   │ *
-             BorrowRecord
-                   │
-                   │ *
-                   │
-                   └─────────────── Book
+---
 
-Each borrow record stores:
+## 🗄️ Database Schema
 
-Borrow Date
-Due Date
-Return Date
-Returned Status
-REST API Endpoints
-Book APIs
-Method	Endpoint	Description
-POST	/api/books	Add a Book
-GET	/api/books	Get All Books
-GET	/api/books/{id}	Get Book by ID
-PUT	/api/books/{id}	Update Book
-DELETE	/api/books/{id}	Delete Book
-Member APIs
-Method	Endpoint	Description
-POST	/api/members	Add Member
-GET	/api/members	Get All Members
-PUT	/api/members/{id}	Update Member
-Borrow APIs
-Method	Endpoint	Description
-POST	/api/borrow	Borrow Book
-POST	/api/return	Return Book
+The database uses 4 relational tables in PostgreSQL:
 
-Total APIs: 10
+1. **`users`**: Authentication credentials (`username`, BCrypt-hashed `password`, `role`).
+2. **`members`**: Library members (`member_id`, `name`, `email`, `phone_number`).
+3. **`books`**: Book inventory (`id`, `title`, `author`, `available`).
+4. **`borrow_records`**: Tracking borrowing transactions (`borrow_id`, FK `book_id`, FK `member_id`, `borrow_date`, `due_date`, `return_date`, `returned`).
 
-Validation
+---
 
-The application validates incoming requests using Jakarta Validation.
+## 🔌 REST API Summary
 
-Examples:
+### 🔑 Authentication Endpoints
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|---|
+| `POST` | `/auth/register` | Register a new user | ❌ No |
+| `POST` | `/auth/login` | Authenticate user & receive JWT token | ❌ No |
 
-Name cannot be blank
-Email must be valid
-Book title is required
-Author is required
-ISBN cannot be empty
-Exception Handling
+### 📚 Book Endpoints
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|---|
+| `GET` | `/api/books` | Get list of all books | ✅ Yes |
+| `GET` | `/api/books/{id}` | Get book by ID | ✅ Yes |
+| `POST` | `/api/books` | Add a new book | ✅ Yes |
+| `PUT` | `/api/books/{id}` | Update book details | ✅ Yes |
+| `DELETE` | `/api/books/{id}` | Delete a book | ✅ Yes |
 
-Custom exceptions include:
+### 👤 Member Endpoints
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|---|
+| `GET` | `/api/members` | Get list of all members | ✅ Yes |
+| `GET` | `/api/members/{memberId}` | Get member by ID | ✅ Yes |
+| `POST` | `/api/members` | Add a new member | ✅ Yes |
+| `PUT` | `/api/members/{memberId}` | Update member details | ✅ Yes |
+| `DELETE` | `/api/members/{memberId}` | Delete a member | ✅ Yes |
 
-BookNotFoundException
-MemberNotFoundException
-BookUnavailableException
+### 📖 Borrow & Return Endpoints
+| Method | Endpoint | Description | Auth Required |
+|---|---|---|---|
+| `POST` | `/api/borrow` | Borrow an available book | ✅ Yes |
+| `POST` | `/api/borrow/return/{borrowId}` | Return a borrowed book | ✅ Yes |
 
-A global exception handler provides meaningful HTTP responses for validation and application errors.
+---
 
-Business Workflow
-Borrow Book
-Validate request.
-Check if the member exists.
-Check if the book exists.
-Verify that the book is available.
-Create a borrow record.
-Mark the book as unavailable.
-Save changes to the database.
-Return Book
-Validate request.
-Find the borrow record.
-Verify the book has not already been returned.
-Update the return date.
-Mark the borrow record as returned.
-Make the book available again.
-Save changes to the database.
-How to Run
-Clone the Repository
-git clone https://github.com/<your-username>/library-management-system.git
-Navigate to the Project
-cd library-management-system
-Configure PostgreSQL
+## ⚙️ How to Setup & Run
 
-Update application.properties:
+### 1. Prerequisites
+- Java 21 SDK
+- PostgreSQL database server running on `localhost:5432`
 
-spring.datasource.url=jdbc:postgresql://localhost:5432/library_db
-spring.datasource.username=YOUR_USERNAME
-spring.datasource.password=YOUR_PASSWORD
-Build the Project
-mvn clean install
-Run the Application
+### 2. Configure Environment / `application.properties`
+Update database credentials in `src/main/resources/application.properties` or set environment variables:
+```properties
+spring.datasource.url=${DB_URL:jdbc:postgresql://localhost:5432/library}
+spring.datasource.username=${DB_USERNAME:postgres}
+spring.datasource.password=${DB_PASSWORD:postgres}
+jwt.secret=${JWT_SECRET:5F05gEkmG5Gxi6GHqehXUFlsusNdoO0tXnwuK1iUVpQ=}
+```
+
+### 3. Build & Run
+```bash
+# Compile and test
+mvn clean test-compile
+
+# Run application
 mvn spring-boot:run
+```
+The server will start on `http://localhost:8080`.
 
-The server starts on:
+---
 
-http://localhost:8080
-Future Improvements
-Spring Security + JWT Authentication
-Role-Based Authorization
-Swagger/OpenAPI Documentation
-Docker Support
-Unit & Integration Testing
-Pagination & Sorting
-Search APIs
-Book Reservation System
-Author
+## 🚀 Future Roadmap
+- [ ] Add pagination and sorting support (`Pageable`) for Book and Member APIs.
+- [ ] Fine-grained role-based endpoint authorization (`hasRole('ADMIN')`).
+- [ ] Swagger / OpenAPI 3.0 documentation integration.
+- [ ] Docker & Docker Compose setup for database and application containerization.
 
-Nikunj Garg
+---
 
-GitHub: https://github.com/gargnikunj991-ux
-LinkedIn: https://www.linkedin.com/in/<your-linkedin-id>
+## 👤 Author
+**Nikunj Garg**  
+GitHub: [gargnikunj991-ux](https://github.com/gargnikunj991-ux)

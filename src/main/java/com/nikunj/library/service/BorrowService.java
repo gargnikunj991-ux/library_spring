@@ -4,6 +4,7 @@ import java.time.LocalDate;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.nikunj.library.dto.BorrowResponse;
 import com.nikunj.library.dto.CreateBorrowRequest;
@@ -27,6 +28,7 @@ public class BorrowService {
     @Autowired
     private BorrowRecordRepository borrowRecordRepository;
 
+    @Transactional
     public BorrowResponse borrowBook(CreateBorrowRequest request) {
         Long memberId = request.getMemberId();
         Long bookId   = request.getBookId();
@@ -79,6 +81,7 @@ public class BorrowService {
         return response;
     }
 
+    @Transactional
     public BorrowResponse returnBook(Long borrowId) {
         BorrowRecord borrowRecord = borrowRecordRepository.findById(borrowId)
                 .orElseThrow(() -> new BorrowRecordNotFoundException("Borrow record not found"));

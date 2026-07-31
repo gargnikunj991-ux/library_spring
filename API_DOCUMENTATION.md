@@ -11,21 +11,45 @@ Spring Security (`SecurityConfig.java`) is enabled across all API endpoints:
 - **Authentication**: Required (`.anyRequest().authenticated()`)
 - **Authorization**: Credentials must be supplied via HTTP Authentication for protected endpoints.
 
-### 🔑 Authentication Service & User Registration (`AuthService`)
-- **Registration Method**: `registerUser(RegisterRequest request)`
-- **Request DTO**: `RegisterRequest`
-  ```json
-  {
-    "username": "johndoe",
-    "password": "secretpassword",
-    "role": "ADMIN" // Roles available: ADMIN, LIBRARIAN, ASSISTANT
-  }
-  ```
+### 🔑 Authentication Endpoints (`/auth`)
+
+Base Path: `/auth`
+
+#### 🔹 0.1 Register User
+- **HTTP Method**: `POST`
+- **Path**: `/auth/register`
+- **Description**: Registers a new user account with BCrypt password encoding.
+- **Request Body**: `RegisterRequest` (JSON)
+```json
+{
+  "username": "johndoe",
+  "password": "secretpassword",
+  "role": "ADMIN"
+}
+```
 - **Validation Rules**:
   - `username`: `@NotBlank(message = "Username is mandatory")`
   - `password`: `@NotBlank(message = "Password is mandatory")`
-  - `role`: `@NotNull(message = "Role is mandatory")`
-- **Security Behavior**: Password is BCrypt-encoded using `PasswordEncoder.encode()` before persisting into the PostgreSQL `users` table.
+  - `role`: `@NotNull(message = "Role is mandatory")` (Roles: `ADMIN`, `LIBRARIAN`, `ASSISTANT`)
+- **Response**: `200 OK` ("User registered successfully")
+
+#### 🔹 0.2 User Login
+- **HTTP Method**: `POST`
+- **Path**: `/auth/login`
+- **Description**: Authenticates user credentials and returns a signed JWT Bearer token.
+- **Request Body**: `LoginRequest` (JSON)
+```json
+{
+  "username": "johndoe",
+  "password": "secretpassword"
+}
+```
+- **Response**: `200 OK`
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiJ9..."
+}
+```
 
 ---
 
