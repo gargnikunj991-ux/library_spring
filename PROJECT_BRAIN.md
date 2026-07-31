@@ -79,7 +79,8 @@ The goal is to master Spring Boot concepts ground-up:
 
 6. **Security & User Model**:
    - [x] `spring-boot-starter-security` added to build dependencies
-   - [x] `SecurityConfig.java` enforcing request authentication and disabling CSRF
+   - [x] `SecurityConfig.java` enforcing request authentication, disabling CSRF, and using stateless session management (`SessionCreationPolicy.STATELESS`)
+   - [x] `JwtAuthenticationFilter` (no `@Component`) manually instantiated inside `SecurityConfig.securityFilterChain()` to prevent double filter registration
    - [x] `User` entity mapped to `users` database table with `username`, `password`, and `Role` (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) with setters (`setUsername`, `setPassword`, `setRole`)
    - [x] `AuthService.registerUser(RegisterRequest request)` implemented with `PasswordEncoder` hashing and database persistence via `UserRepository`
    - [x] `CustomUserDetailsService.loadUserByUsername()` implemented — queries `UserRepository.findByUsername()` and throws `UsernameNotFoundException` if user not found
