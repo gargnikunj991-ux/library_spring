@@ -2,15 +2,16 @@ package com.nikunj.library.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 import com.nikunj.library.service.CustomUserDetailsService;
 import com.nikunj.library.service.JwtService;
@@ -38,7 +39,18 @@ public class SecurityConfig {
         );
 
         http.authorizeHttpRequests(auth -> auth
-            .requestMatchers("/auth/**").permitAll()
+            .requestMatchers("/auth/login").permitAll()
+            .requestMatchers("/auth/register").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.DELETE,"/api/books/{id}").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.POST,"/api/books").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
+            .requestMatchers(HttpMethod.PUT,"/api/books/**").hasAnyRole("ADMIN","LIBRARIAN")
+            .requestMatchers(HttpMethod.GET,"/api/books/**").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
+            .requestMatchers(HttpMethod.DELETE,"/api/members/**").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.POST,"/api/member").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
+            .requestMatchers(HttpMethod.PUT,"/api/member/**").hasAnyRole("ADMIN","LIBRARIAN")
+            .requestMatchers(HttpMethod.GET,"/api/member/**").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
+            .requestMatchers(HttpMethod.POST,"/api/borrow").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
+            .requestMatchers(HttpMethod.POST,"/api/borrow/return/**").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
             .anyRequest().authenticated()
         );
 
