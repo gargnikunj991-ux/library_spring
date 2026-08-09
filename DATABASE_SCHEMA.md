@@ -14,20 +14,20 @@ This document describes the PostgreSQL database schema, JPA entity mapping, tabl
 │     title               │             │     name                │             │     username (unique)   │
 │     author              │             │     email               │             │     password            │
 │     available           │             │     phone_number        │             │     role                │
-└────────────┬────────────┘             └────────────┬────────────┘             └─────────────────────────┘
-             │                                       │
-             │ 1                                     │ 1
-             │                                       │
-             │ N                                     │ N
-┌────────────┴───────────────────────────────────────┴────────────┐
-│                         borrow_records                          │
-├─────────────────────────────────────────────────────────────────┤
-│ PK  borrow_id                                                   │
-│ FK  book_id    ──────────────► books(id)                        │
-│ FK  member_id  ──────────────► members(member_id)               │
-│     borrow_date                                                 │
-│     due_date                                                    │
-│     return_date                                                 │
+└────────────┬────────────┘             └────────────┬────────────┘             └────────────┬────────────┘
+             │                                       │                                       │
+             │ 1                                     │ 1                                     │ 1
+             │                                       │                                       │
+             │ N                                     │ N                                     │ N
+┌────────────┴───────────────────────────────────────┴────────────┐             ┌────────────┴────────────┐
+│                         borrow_records                          │             │     refresh_tokens      │
+├─────────────────────────────────────────────────────────────────┤             ├─────────────────────────┤
+│ PK  borrow_id                                                   │             │ PK  id                  │
+│ FK  book_id    ──────────────► books(id)                        │             │ FK  user_id ──►users(id)│
+│ FK  member_id  ──────────────► members(member_id)               │             │     token (unique)      │
+│     borrow_date                                                 │             │     expiry_date         │
+│     due_date                                                    │             │     revoked             │
+│     return_date                                                 │             └─────────────────────────┘
 │     returned                                                    │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -166,9 +166,47 @@ public class User implements UserDetails {
         ASSISTANT
     }
 
+    public Long getId() { return id; }
     public void setUsername(String username) { this.username = username; }
     public void setPassword(String password) { this.password = password; }
     public void setRole(Role role) { this.role = role; }
+}
+```
+
+---
+
+### 5. `refresh_tokens` Table
+
+Mapped to Entity: `com.nikunj.library.model.RefreshToken`
+
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
+|---|---|---|---|---|
+| `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for the refresh token record |
+| `token` | `VARCHAR(255)` | `@Column(nullable = false, unique = true)` | UNIQUE, NOT NULL | Refresh token string |
+| `expiry_date` | `TIMESTAMP WITH TIME ZONE` | `@Column(nullable = false)` | NOT NULL | Expiration timestamp (`Instant`) |
+| `user_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "user_id", nullable = false)` | Foreign Key -> `users(id)` | Associated user entity reference |
+| `revoked` | `BOOLEAN` | Field: `revoked` | NOT NULL | Flag indicating if token is revoked |
+
+**JPA Mapping (`RefreshToken.java`)**:
+```java
+@Entity
+@Table(name = "refresh_tokens")
+public class RefreshToken {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String token;
+
+    @Column(nullable = false)
+    private Instant expiryDate;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    private boolean revoked;
 }
 ```
 
@@ -178,4 +216,5 @@ public class User implements UserDetails {
 
 - `spring.jpa.hibernate.ddl-auto=update`: Hibernate automatically synchronizes Java entity definitions with PostgreSQL database tables.
 - `spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect`: Configures Hibernate dialect for PostgreSQL compatibility.
+
 

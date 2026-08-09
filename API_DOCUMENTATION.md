@@ -323,7 +323,7 @@ Base Path: `/api/borrow`
 
 ## ⚠️ 4. Global Error Handling & HTTP Status Codes
 
-Centralized in `GlobalExceptionHandler.java`:
+### Application Exceptions (Centralized in `GlobalExceptionHandler.java`):
 
 | Exception Class | HTTP Status Code | Response Body Format |
 |---|---|---|
@@ -332,3 +332,11 @@ Centralized in `GlobalExceptionHandler.java`:
 | `BookUnavailableException` | `404 NOT_FOUND` | `"Book Not available"` |
 | `BorrowRecordNotFoundException` | `404 NOT_FOUND` | `"Borrow Record Not Found"` |
 | `MethodArgumentNotValidException` | `400 BAD_REQUEST` | `["Error message 1", "Error message 2"]` |
+
+### Security Filter Exceptions (Configured in `SecurityConfig.java`):
+
+| Scenario | HTTP Status Code | Response Body Format |
+|---|---|---|
+| Missing, invalid, or expired JWT token (`AuthenticationEntryPoint`) | `401 UNAUTHORIZED` | `{"error": "Unauthorized", "message": "Full authentication is required to access this resource"}` |
+| Insufficient role / permission (`AccessDeniedHandler`) | `403 FORBIDDEN` | `{"error": "Forbidden", "message": "You do not have permission to access this resource"}` |
+

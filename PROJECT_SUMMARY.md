@@ -40,6 +40,7 @@ Centralized Exception Handling is managed across all controllers using `@Control
 - **Framework**: Spring Boot 4.1.0
 - **Web**: Spring MVC (`spring-boot-starter-webmvc`)
 - **Security**: Spring Security (`spring-boot-starter-security`)
+- **Environment**: Dotenv Java (`dotenv-java`)
 - **Data Persistence**: Spring Data JPA (`spring-boot-starter-data-jpa`), Hibernate
 - **Database**: PostgreSQL (Driver: `org.postgresql.Driver`)
 - **Validation**: Jakarta Validation (`spring-boot-starter-validation`)
@@ -53,9 +54,9 @@ Base package: `com.nikunj.library`
 
 ```
 com.nikunj.library
-├── LibraryApplication.java           # Main Spring Boot Application Entry Point
+├── LibraryApplication.java           # Main Spring Boot Application Entry Point (Loads .env properties via Dotenv)
 ├── config/                           # Security & Application Configuration
-│   ├── SecurityConfig.java           # Spring Security filter chain setup (stateless JWT, manual filter registration)
+│   ├── SecurityConfig.java           # Spring Security filter chain setup (stateless JWT, 401 AuthenticationEntryPoint, 403 AccessDeniedHandler)
 │   └── JwtAuthenticationFilter.java  # JWT token validation filter (OncePerRequestFilter, no @Component)
 ├── controller/                       # REST Controller Layer
 │   ├── AuthController.java           # REST Endpoints for /auth (login & register integration)
@@ -78,6 +79,7 @@ com.nikunj.library
 │   ├── Book.java                     # "books" table entity
 │   ├── Member.java                   # "members" table entity
 │   ├── BorrowRecord.java             # "borrow_records" table entity with Foreign Keys
+│   ├── RefreshToken.java             # "refresh_tokens" table entity for JWT refresh token rotation (@ManyToOne User relation)
 │   └── User.java                     # "users" table entity for authentication (Role: ADMIN, LIBRARIAN, ASSISTANT)
 ├── dto/                              # Data Transfer Objects (API Contracts)
 │   ├── BookResponse.java             # Outbound DTO for Book responses
@@ -115,7 +117,10 @@ com.nikunj.library
    - Resets the associated `Book` entity's `available` flag to `true` (`book.setAvailable(true)`).
 
 3. **Security & User Registration**:
-   - `SecurityConfig` configures `SecurityFilterChain` to disable CSRF, enforce stateless session management (`SessionCreationPolicy.STATELESS`), and enforce authentication on incoming endpoints (`.anyRequest().authenticated()`). The `JwtAuthenticationFilter` is manually instantiated inside `securityFilterChain()` (not registered as a `@Component`) to prevent double filter registration.
+   - `SecurityConfig` configures `SecurityFilterChain` to disable CSRF, enforce stateless session management (`SessionCreationPolicy.STATELESS`), and configure explicit exception handling:
+     - `AuthenticationEntryPoint`: Returns `401 Unauthorized` for missing/invalid JWT tokens.
+     - `AccessDeniedHandler`: Returns `403 Forbidden` for insufficient roles/permissions.
+   - The `JwtAuthenticationFilter` is manually instantiated inside `securityFilterChain()` (not registered as a `@Component`) to prevent double filter registration.
    - `User` entity maps to the `users` table with fields `id`, `username` (unique, non-null), `password`, and `role` (`EnumType.STRING` with roles `ADMIN`, `LIBRARIAN`, `ASSISTANT`).
    - `AuthService.registerUser(RegisterRequest request)` handles user registration:
      - Instantiates a new `User` entity.

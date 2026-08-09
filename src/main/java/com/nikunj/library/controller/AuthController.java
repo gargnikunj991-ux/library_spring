@@ -21,16 +21,11 @@ import jakarta.validation.Valid;
 @Validated
 public class AuthController {
 
-    private final AuthenticationManager authenticationManager;
-    private final JwtService jwtService;
+
     private final AuthService authService;
 
-    public AuthController(AuthenticationManager authenticationManager,
-                          JwtService jwtService,
-                          AuthService authService) {
+    public AuthController(AuthService authService) {
 
-        this.authenticationManager = authenticationManager;
-        this.jwtService = jwtService;
         this.authService = authService;
     }
 
@@ -38,18 +33,12 @@ public class AuthController {
     public ResponseEntity<LoginResponse> login(
             @Valid @RequestBody LoginRequest request) {
 
-        Authentication authentication =
-                authenticationManager.authenticate(
-                        new UsernamePasswordAuthenticationToken(
-                                request.getUsername(),
-                                request.getPassword()));
+         LoginResponse  response =   String authService.loginUser(request);
 
-        UserDetails userDetails =
-                (UserDetails) authentication.getPrincipal();
+       return ResponseEntity.ok(response);
+     
 
-        String token = jwtService.generateToken(userDetails);
-
-        return ResponseEntity.ok(new LoginResponse(token));
+        
     }
 
     @PostMapping("/register")

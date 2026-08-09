@@ -87,6 +87,9 @@ The goal is to master Spring Boot concepts ground-up:
    - [x] `JwtService` updated to inject `jwt.secret` dynamically via `@Value` instead of hardcoded string
    - [x] `BorrowService` methods annotated with `@Transactional` for atomic entity state management
    - [x] `JwtAuthenticationFilter` refactored to use standard SLF4J logging instead of `System.out.println`
+   - [x] `dotenv-java` added to `pom.xml` and loaded in `LibraryApplication.java` via `Dotenv.configure().ignoreIfMissing().load()`
+   - [x] `RefreshToken` entity mapped to `refresh_tokens` table with `id`, `token` (unique), `expiryDate`, `@ManyToOne` `User` relation (`user_id`), and `revoked` flag
+   - [x] `SecurityConfig.java` configured with `AuthenticationEntryPoint` (`401 Unauthorized` for missing/invalid JWT) and `AccessDeniedHandler` (`403 Forbidden` for insufficient roles)
 
 ---
 
