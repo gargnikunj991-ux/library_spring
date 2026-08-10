@@ -54,8 +54,9 @@ public class SecurityConfig {
         );
 
         http.authorizeHttpRequests(auth -> auth
-            .requestMatchers("/auth/login").permitAll()
+            .requestMatchers("/auth/login", "/auth/refresh").permitAll()
             .requestMatchers("/auth/register").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.POST, "/auth/logout").hasAnyRole("ADMIN", "LIBRARIAN", "ASSISTANT")
             .requestMatchers(HttpMethod.DELETE,"/api/books/{id}").hasRole("ADMIN")
             .requestMatchers(HttpMethod.POST,"/api/books").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
             .requestMatchers(HttpMethod.PUT,"/api/books/**").hasAnyRole("ADMIN","LIBRARIAN")

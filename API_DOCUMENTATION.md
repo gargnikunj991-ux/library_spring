@@ -36,7 +36,7 @@ Base Path: `/auth`
 #### 🔹 0.2 User Login
 - **HTTP Method**: `POST`
 - **Path**: `/auth/login`
-- **Description**: Authenticates user credentials and returns a signed JWT Bearer token.
+- **Description**: Authenticates user credentials and returns a signed JWT access token and a refresh token.
 - **Request Body**: `LoginRequest` (JSON)
 ```json
 {
@@ -47,9 +47,45 @@ Base Path: `/auth`
 - **Response**: `200 OK`
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiJ9..."
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "4a7e9b21-8c34-4d82-bcf2-9e1234567890",
+  "tokenType": "Bearer"
 }
 ```
+
+#### 🔹 0.3 Refresh Access Token
+- **HTTP Method**: `POST`
+- **Path**: `/auth/refresh`
+- **Description**: Verifies a valid refresh token from PostgreSQL and issues a fresh JWT access token.
+- **Request Body**: `RefreshTokenRequest` (JSON)
+```json
+{
+  "refreshToken": "4a7e9b21-8c34-4d82-bcf2-9e1234567890"
+}
+```
+- **Validation Rules**:
+  - `refreshToken`: `@NotBlank(message = "Refresh token is mandatory")`
+- **Response**:
+  - `200 OK`: Returns new `LoginResponse` containing renewed `accessToken` and `refreshToken`.
+  - `401 Unauthorized`: If refresh token is expired, revoked, or not found in database.
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "4a7e9b21-8c34-4d82-bcf2-9e1234567890",
+  "tokenType": "Bearer"
+}
+```
+
+#### 🔹 0.4 User Logout & Token Revocation
+- **HTTP Method**: `POST`
+- **Path**: `/auth/logout`
+- **Description**: Invalidates and revokes the active refresh token (`revoked = true`) in the database for the authenticated user.
+- **Authorization**: Required (`Bearer <accessToken>`). Requires role: `ADMIN`, `LIBRARIAN`, or `ASSISTANT`.
+- **Request Body**: None
+- **Response**:
+  - `200 OK`: `"User logged out and refresh token revoked successfully"`
+  - `401 Unauthorized`: Missing or invalid JWT access token.
+  - `403 Forbidden`: Insufficient role permissions.
 
 ---
 
@@ -331,6 +367,7 @@ Base Path: `/api/borrow`
 | `MemberNotFoundException` | `404 NOT_FOUND` | `"Member Not Found"` |
 | `BookUnavailableException` | `404 NOT_FOUND` | `"Book Not available"` |
 | `BorrowRecordNotFoundException` | `404 NOT_FOUND` | `"Borrow Record Not Found"` |
+| `TokenRefreshException` | `401 UNAUTHORIZED` | `"Failed for [token]: message"` |
 | `MethodArgumentNotValidException` | `400 BAD_REQUEST` | `["Error message 1", "Error message 2"]` |
 
 ### Security Filter Exceptions (Configured in `SecurityConfig.java`):

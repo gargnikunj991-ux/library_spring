@@ -55,5 +55,13 @@ public ResponseEntity<String> handleException(BorrowRecordNotFoundException ex){
     );
 }
 
+@ExceptionHandler(TokenRefreshException.class)
+public ResponseEntity<String> handleException(TokenRefreshException ex){
+    return new ResponseEntity<>(
+        ex.getMessage(),
+        HttpStatus.UNAUTHORIZED
+    );
+}
+
 }
 

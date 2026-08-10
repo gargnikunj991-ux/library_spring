@@ -1,8 +1,8 @@
 package com.nikunj.library.service;
 
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import com.nikunj.library.dto.LoginRequest;
 import com.nikunj.library.dto.LoginResponse;
 import com.nikunj.library.dto.RegisterRequest;
+import com.nikunj.library.model.RefreshToken;
 import com.nikunj.library.model.User;
 import com.nikunj.library.repository.UserRepository;
 
@@ -19,17 +20,19 @@ public class AuthService {
     private final JwtService jwtService;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        AuthenticationManager authenticationManager,
-                       JwtService jwtService
-                       ) {
+                       JwtService jwtService,
+                       RefreshTokenService refreshTokenService) {
 
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
-        this.jwtService = jwtService
+        this.jwtService = jwtService;
+        this.refreshTokenService = refreshTokenService;
     }
 
     public String registerUser(RegisterRequest request) {
@@ -47,8 +50,8 @@ public class AuthService {
 
         return "User registered successfully";
     }
-    public String loginUser(LoginRequest request){
 
+    public LoginResponse loginUser(LoginRequest request){
 
         Authentication authentication =
                 authenticationManager.authenticate(
@@ -59,10 +62,14 @@ public class AuthService {
         UserDetails userDetails =
                 (UserDetails) authentication.getPrincipal();
 
-             String token = jwtService.generateToken(userDetails);
-             
-             return ResponseEntity.ok(new LoginResponse(token));      
+        String token = jwtService.generateToken(userDetails);
+        RefreshToken refreshToken = refreshTokenService.createRefreshToken(userDetails.getUsername());
 
+        return new LoginResponse(token, refreshToken.getToken());
+    }
+
+    public String logoutUser(String username) {
+        return refreshTokenService.revokeByUsername(username);
     }
 
 }

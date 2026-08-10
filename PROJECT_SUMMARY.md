@@ -69,11 +69,13 @@ com.nikunj.library
 │   ├── BorrowService.java            # Book borrowing & return transaction logic
 │   ├── CustomUserDetailsService.java# Spring Security UserDetailsService implementation
 │   ├── JwtService.java               # JWT token generation and validation service
-│   └── MemberService.java            # Member CRUD logic & DTO mapping
+│   ├── MemberService.java            # Member CRUD logic & DTO mapping
+│   └── RefreshTokenService.java      # Refresh token creation, expiry verification, and rotation logic
 ├── repository/                       # Data Access Layer (Spring Data JPA)
 │   ├── BookRepository.java           # JpaRepository<Book, Long>
 │   ├── BorrowRecordRepository.java   # JpaRepository<BorrowRecord, Long>
 │   ├── MemberRepository.java         # JpaRepository<Member, Long>
+│   ├── RefreshTokenRepository.java   # JpaRepository<RefreshToken, Long>
 │   └── UserRepository.java           # JpaRepository<User, Long>
 ├── model/                            # JPA Database Entities
 │   ├── Book.java                     # "books" table entity
@@ -88,14 +90,16 @@ com.nikunj.library
 │   ├── CreateBorrowRequest.java      # Inbound DTO for borrowing a book
 │   ├── CreateMemberRequest.java      # Inbound DTO for creating/updating Members
 │   ├── LoginRequest.java             # Inbound DTO for authentication
-│   ├── LoginResponse.java            # Outbound DTO containing JWT token
+│   ├── LoginResponse.java            # Outbound DTO containing accessToken, refreshToken, tokenType
 │   ├── MemberResponse.java           # Outbound DTO for Member responses
+│   ├── RefreshTokenRequest.java      # Inbound DTO for token renewal (/auth/refresh)
 │   └── RegisterRequest.java          # Inbound DTO for user registration
 └── exception/                        # Custom Exceptions & Global Handler
     ├── BookNotFoundException.java    # Thrown when Book ID is not found (HTTP 404)
     ├── MemberNotFoundException.java  # Thrown when Member ID is not found (HTTP 404)
     ├── BookUnavailableException.java# Thrown when Book is already borrowed (HTTP 404)
     ├── BorrowRecordNotFoundException.java # Thrown when Borrow Record ID is not found (HTTP 404)
+    ├── TokenRefreshException.java    # Thrown when Refresh Token is expired or invalid (HTTP 401)
     └── GlobalExceptionHandler.java   # Centralized @ControllerAdvice handling all exceptions
 ```
 
@@ -116,17 +120,16 @@ com.nikunj.library
    - Sets `returned = true` and `returnDate = LocalDate.now()`.
    - Resets the associated `Book` entity's `available` flag to `true` (`book.setAvailable(true)`).
 
-3. **Security & User Registration**:
+3. **Security, User Registration & Refresh Token Rotation**:
    - `SecurityConfig` configures `SecurityFilterChain` to disable CSRF, enforce stateless session management (`SessionCreationPolicy.STATELESS`), and configure explicit exception handling:
      - `AuthenticationEntryPoint`: Returns `401 Unauthorized` for missing/invalid JWT tokens.
      - `AccessDeniedHandler`: Returns `403 Forbidden` for insufficient roles/permissions.
    - The `JwtAuthenticationFilter` is manually instantiated inside `securityFilterChain()` (not registered as a `@Component`) to prevent double filter registration.
    - `User` entity maps to the `users` table with fields `id`, `username` (unique, non-null), `password`, and `role` (`EnumType.STRING` with roles `ADMIN`, `LIBRARIAN`, `ASSISTANT`).
-   - `AuthService.registerUser(RegisterRequest request)` handles user registration:
-     - Instantiates a new `User` entity.
-     - Sets username and role from `RegisterRequest`.
-     - Encodes the raw password using `PasswordEncoder.encode(...)` before storing.
-     - Saves user to PostgreSQL via `UserRepository.save(...)`.
+   - `AuthService.registerUser(RegisterRequest request)` handles user registration with BCrypt hashing.
+   - `AuthService.loginUser(LoginRequest request)` authenticates credentials and returns both an access token (JWT) and a persisted refresh token (UUID).
+   - `RefreshTokenService` validates expiration and issues new access tokens on `POST /auth/refresh`. If token expired or revoked, `TokenRefreshException` is thrown.
+   - `POST /auth/logout` requires authentication and a valid role (`ADMIN`, `LIBRARIAN`, `ASSISTANT`), delegating to `RefreshTokenService.revokeByUsername()` to set `revoked = true` in PostgreSQL.
 
 4. **DTO Isolation**:
    - Entities (`Book`, `Member`, `BorrowRecord`, `User`) are **never** exposed directly to API callers.

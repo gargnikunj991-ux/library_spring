@@ -29,6 +29,7 @@ public class RefreshToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(nullable = false)
     private boolean revoked;
 
     public RefreshToken() {
@@ -43,10 +44,6 @@ public class RefreshToken {
 
     public Long getId() {
         return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
     }
 
     public String getToken() {

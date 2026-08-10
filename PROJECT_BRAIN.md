@@ -89,6 +89,13 @@ The goal is to master Spring Boot concepts ground-up:
    - [x] `JwtAuthenticationFilter` refactored to use standard SLF4J logging instead of `System.out.println`
    - [x] `dotenv-java` added to `pom.xml` and loaded in `LibraryApplication.java` via `Dotenv.configure().ignoreIfMissing().load()`
    - [x] `RefreshToken` entity mapped to `refresh_tokens` table with `id`, `token` (unique), `expiryDate`, `@ManyToOne` `User` relation (`user_id`), and `revoked` flag
+   - [x] `RefreshTokenRepository` created with `findByToken` and `deleteByUser`
+   - [x] `RefreshTokenService` implemented with `createRefreshToken`, `verifyExpiration`, `refreshAccessToken`, and `deleteByUsername`
+   - [x] `POST /auth/refresh` endpoint added in `AuthController` returning renewed access and refresh tokens
+   - [x] `LoginResponse` updated to supply `accessToken`, `refreshToken`, and `tokenType`
+   - [x] `TokenRefreshException` handled globally with `401 Unauthorized` response in `GlobalExceptionHandler`
+   - [x] `POST /auth/logout` endpoint added with role authorization (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) and refresh token revocation (`revoked=true`)
+   - [x] `SecurityConfig.java` updated to permit `/auth/refresh` without authentication
    - [x] `SecurityConfig.java` configured with `AuthenticationEntryPoint` (`401 Unauthorized` for missing/invalid JWT) and `AccessDeniedHandler` (`403 Forbidden` for insufficient roles)
 
 ---
