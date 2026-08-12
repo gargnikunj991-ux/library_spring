@@ -1,166 +1,344 @@
 # 📚 Library Management System Backend
 
-> A production-grade RESTful Library Management System backend built with **Java 21**, **Spring Boot 4.1.0**, **Spring Data JPA**, **Spring Security with JWT**, and **PostgreSQL**.
+[![Java](https://img.shields.io/badge/Java-21-orange.svg?style=flat&logo=openjdk)](https://adoptium.net/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-brightgreen.svg?style=flat&logo=springboot)](https://spring.io/projects/spring-boot)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg?style=flat&logo=postgresql)](https://www.postgresql.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Status](https://img.shields.io/badge/Status-Complete%20v1.0.0-success.svg)](docs/PROJECT_STATUS.md)
+
+> A production-grade RESTful Library Management System backend built with **Java 21**, **Spring Boot 4.1.0**, **Spring Data JPA**, **Spring Security (Stateless JWT + Refresh Token Rotation)**, and **PostgreSQL**.
 
 ---
 
-## 🎯 Overview
-
-The Library Management System provides a clean, layered backend architecture (`Controller` → `Service` → `Repository`) for managing books, library members, user registration/authentication, borrowing, and returning books.
-
-Key Highlights:
-- **Clean Architecture & Isolation**: Entities are never exposed directly; all API communication uses validated DTOs.
-- **Security & Stateless JWT Auth**: Protected REST endpoints using Spring Security and stateless JWT authentication filter.
-- **Atomic Transactions**: Book borrowing and returning workflows managed with `@Transactional` guarantees.
-- **Robust Exception Handling**: Global exception handling via `@ControllerAdvice` and sanitized HTTP error responses (`server.error.include-stacktrace=never`).
+## 📑 Table of Contents
+- [🎯 What Problem It Solves](#-what-problem-it-solves)
+- [✨ Key Features](#-key-features)
+- [🛠️ Tech Stack](#️-tech-stack)
+- [🧭 Architecture Overview](#-architecture-overview)
+- [📂 Project Directory Structure](#-project-directory-structure)
+- [📋 Prerequisites](#-prerequisites)
+- [⚙️ Environment Variables](#️-environment-variables)
+- [🗄️ Database Setup](#️-database-setup)
+- [🚀 How to Run Locally](#-how-to-run-locally)
+- [🔌 REST API Overview](#-rest-api-overview)
+- [💡 Example API Requests & Responses](#-example-api-requests--responses)
+- [⚠️ Validation & Error Handling](#️-validation--error-handling)
+- [🧪 Testing Instructions](#-testing-instructions)
+- [📈 Future Improvements](#-future-improvements)
+- [📚 Full Documentation Index](#-full-documentation-index)
+- [👤 Author & License](#-author--license)
 
 ---
 
-## 🛠️ Tech Stack & Dependencies
+## 🎯 What Problem It Solves
 
-| Layer / Component | Technology |
+Traditional library management often suffers from manual ledger errors, double-checkout conflicts, lost inventory, untracked loan durations, and unauthorized data access. 
+
+This backend solves these challenges by providing:
+1. **Automated Availability & Conflict Prevention**: Guarantees that borrowed books cannot be checked out simultaneously through atomic database transactions.
+2. **Automated Return Due Dates**: Automatically computes standard 14-day checkout windows and tracks real-time return dates.
+3. **Role-Based Access Control (RBAC)**: Protects sensitive administrative functions (user creation, inventory deletion) while allowing librarians and assistants to conduct daily operations.
+4. **Decoupled & Secure API Contracts**: Eliminates data leakage by insulating database entities behind strict Data Transfer Objects (DTOs).
+
+---
+
+## ✨ Key Features
+
+- **🔐 Stateless JWT Authentication & Refresh Token Rotation**:
+  - Secure login issuing signed HMAC-SHA256 JWT access tokens and database-persisted refresh tokens.
+  - Seamless access token renewal via `POST /auth/refresh`.
+  - Instant session invalidation via `POST /auth/logout` (`revoked = true`).
+- **🛡️ Granular Role-Based Authorization**:
+  - Distinct permission tiers for `ADMIN`, `LIBRARIAN`, and `ASSISTANT`.
+- **📖 Book Inventory Management**:
+  - Full CRUD operations with availability state tracking.
+- **👤 Member Registry Management**:
+  - Registration and profile management with email validation.
+- **🔄 Transactional Borrow & Return Engine**:
+  - `@Transactional` state mutations linking books and members with checkout timestamps.
+- **🛡️ Enterprise Error Handling & Sanitization**:
+  - Centralized `@ControllerAdvice` mapping custom exceptions to clean HTTP responses with `server.error.include-stacktrace=never`.
+- **🌱 Secure Environment Configuration**:
+  - Fully parameterized credentials backed by `dotenv-java` and `.env.example`.
+
+---
+
+## 🛠️ Tech Stack
+
+| Category | Technology |
 |---|---|
-| **Language** | Java 21 |
-| **Framework** | Spring Boot 4.1.0 |
-| **Security** | Spring Security, JJWT (`io.jsonwebtoken` 0.12.7) |
-| **ORM / Data Persistence** | Spring Data JPA, Hibernate ORM |
-| **Database** | PostgreSQL |
-| **Validation** | Jakarta Validation (`spring-boot-starter-validation`) |
-| **Build Tool** | Maven |
-| **Logging** | SLF4J / Logback |
+| **Language** | Java 21 (LTS) |
+| **Framework** | Spring Boot 4.1.0 (Spring MVC, Spring Data JPA, Spring Security) |
+| **Database** | PostgreSQL 16+ |
+| **ORM / Persistence** | Hibernate ORM, Spring Data JPA |
+| **Security & Tokens** | Spring Security, JJWT (`io.jsonwebtoken` 0.12.7) |
+| **Validation** | Jakarta Bean Validation (`hibernate-validator`) |
+| **Configuration** | Dotenv Java (`io.github.cdimascio:dotenv-java`) |
+| **Build & Dependency Management** | Maven 3.9+ (Maven Wrapper included) |
 
 ---
 
-## 📂 Project Structure
+## 🧭 Architecture Overview
+
+The system strictly implements **Clean Layered Backend Architecture**:
 
 ```
-com.nikunj.library
-├── LibraryApplication.java           # Main Spring Boot Application Entry Point
-├── config/                           # Security & Application Configuration
-│   ├── SecurityConfig.java           # Spring Security filter chain setup
-│   └── JwtAuthenticationFilter.java  # Custom JWT filter (OncePerRequestFilter with SLF4J logging)
-├── controller/                       # REST Controller Layer
-│   ├── AuthController.java           # Endpoints for /auth/register & /auth/login
-│   ├── BookController.java           # Endpoints for /api/books
-│   ├── MemberController.java         # Endpoints for /api/members
-│   └── Borrowcontroller.java         # Endpoints for /api/borrow
-├── service/                          # Business Logic & Service Layer
-│   ├── AuthService.java              # Registration logic with PasswordEncoder & login support
-│   ├── BookService.java              # Book CRUD logic & DTO mapping
-│   ├── BorrowService.java            # Borrow & Return transactional workflows (@Transactional)
-│   ├── CustomUserDetailsService.java# UserDetailsService implementation for Spring Security
-│   ├── JwtService.java               # JWT generation & validation (@Value("${jwt.secret}"))
-│   └── MemberService.java            # Member CRUD logic & DTO mapping
-├── repository/                       # Data Access Layer (Spring Data JPA)
-│   ├── BookRepository.java           # JpaRepository<Book, Long>
-│   ├── BorrowRecordRepository.java   # JpaRepository<BorrowRecord, Long>
-│   ├── MemberRepository.java         # JpaRepository<Member, Long>
-│   └── UserRepository.java           # JpaRepository<User, Long>
-├── model/                            # JPA Database Entities
-│   ├── Book.java                     # "books" table entity
-│   ├── Member.java                   # "members" table entity
-│   ├── BorrowRecord.java             # "borrow_records" table entity
-│   └── User.java                     # "users" table entity (ADMIN, LIBRARIAN, ASSISTANT)
-├── dto/                              # Data Transfer Objects
-│   ├── BookResponse.java
-│   ├── BorrowResponse.java
-│   ├── CreateBookRequest.java
-│   ├── CreateBorrowRequest.java
-│   ├── CreateMemberRequest.java
-│   ├── LoginRequest.java
-│   ├── LoginResponse.java
-│   ├── MemberResponse.java
-│   └── RegisterRequest.java
-└── exception/                        # Custom Exception Handling
-    ├── BookNotFoundException.java
-    ├── BookUnavailableException.java
-    ├── BorrowRecordNotFoundException.java
-    ├── MemberNotFoundException.java
-    └── GlobalExceptionHandler.java   # Centralized @ControllerAdvice
+[ HTTP Client / Postman / Frontend ]
+               │
+               ▼
+[ Spring Security Filter Chain ]  ── (JWT Validation, RBAC, 401/403 Handling)
+               │
+               ▼
+      [ Controller Layer ]        ── (REST Routing, @Valid DTO Validation, ResponseEntity)
+               │
+               ▼
+       [ Service Layer ]          ── (Business Rules, Transactions @Transactional, DTO Mapping)
+               │
+               ▼
+      [ Repository Layer ]        ── (Spring Data JPA, Hibernate ORM Queries)
+               │
+               ▼
+     [ PostgreSQL Database ]      ── (Relational Persistence: users, tokens, books, members, borrow_records)
 ```
 
 ---
 
-## 🗄️ Database Schema
+## 📂 Project Directory Structure
 
-The database uses 4 relational tables in PostgreSQL:
-
-1. **`users`**: Authentication credentials (`username`, BCrypt-hashed `password`, `role`).
-2. **`members`**: Library members (`member_id`, `name`, `email`, `phone_number`).
-3. **`books`**: Book inventory (`id`, `title`, `author`, `available`).
-4. **`borrow_records`**: Tracking borrowing transactions (`borrow_id`, FK `book_id`, FK `member_id`, `borrow_date`, `due_date`, `return_date`, `returned`).
-
----
-
-## 🔌 REST API Summary
-
-### 🔑 Authentication Endpoints
-| Method | Endpoint | Description | Auth Required |
-|---|---|---|---|
-| `POST` | `/auth/register` | Register a new user | ❌ No |
-| `POST` | `/auth/login` | Authenticate user & receive JWT token | ❌ No |
-
-### 📚 Book Endpoints
-| Method | Endpoint | Description | Auth Required |
-|---|---|---|---|
-| `GET` | `/api/books` | Get list of all books | ✅ Yes |
-| `GET` | `/api/books/{id}` | Get book by ID | ✅ Yes |
-| `POST` | `/api/books` | Add a new book | ✅ Yes |
-| `PUT` | `/api/books/{id}` | Update book details | ✅ Yes |
-| `DELETE` | `/api/books/{id}` | Delete a book | ✅ Yes |
-
-### 👤 Member Endpoints
-| Method | Endpoint | Description | Auth Required |
-|---|---|---|---|
-| `GET` | `/api/members` | Get list of all members | ✅ Yes |
-| `GET` | `/api/members/{memberId}` | Get member by ID | ✅ Yes |
-| `POST` | `/api/members` | Add a new member | ✅ Yes |
-| `PUT` | `/api/members/{memberId}` | Update member details | ✅ Yes |
-| `DELETE` | `/api/members/{memberId}` | Delete a member | ✅ Yes |
-
-### 📖 Borrow & Return Endpoints
-| Method | Endpoint | Description | Auth Required |
-|---|---|---|---|
-| `POST` | `/api/borrow` | Borrow an available book | ✅ Yes |
-| `POST` | `/api/borrow/return/{borrowId}` | Return a borrowed book | ✅ Yes |
-
----
-
-## ⚙️ How to Setup & Run
-
-### 1. Prerequisites
-- Java 21 SDK
-- PostgreSQL database server running on `localhost:5432`
-
-### 2. Configure Environment / `application.properties`
-Update database credentials in `src/main/resources/application.properties` or set environment variables:
-```properties
-spring.datasource.url=${DB_URL:jdbc:postgresql://localhost:5432/library}
-spring.datasource.username=${DB_USERNAME:postgres}
-spring.datasource.password=${DB_PASSWORD:postgres}
-jwt.secret=${JWT_SECRET:5F05gEkmG5Gxi6GHqehXUFlsusNdoO0tXnwuK1iUVpQ=}
+```
+library/
+├── .env.example                       # Template for local environment variables
+├── .gitignore                         # Git exclusion rules
+├── AGENTS.md                          # AI development rules and guidelines
+├── CHANGELOG.md                       # Version history and release notes
+├── CONTRIBUTING.md                    # Contribution workflow and style guide
+├── LICENSE                            # MIT License
+├── README.md                          # Master project documentation
+├── SECURITY.md                        # Security policy and vulnerability disclosure
+├── pom.xml                            # Maven dependencies and build plugins
+├── mvnw / mvnw.cmd                    # Cross-platform Maven Wrapper scripts
+│
+├── docs/                              # Detailed Documentation Suite
+│   ├── API_DOCUMENTATION.md           # Comprehensive REST API specifications
+│   ├── ARCHITECTURE.md                # System design, layer deep-dive & sequence flows
+│   ├── DATABASE.md                    # PostgreSQL schemas, ERD, tables & constraints
+│   ├── PROJECT_STATUS.md              # Milestones, retrospective & limitations
+│   ├── SETUP.md                       # Step-by-step local installation guide
+│   ├── TESTING.md                     # Automated test suites, test matrix & cURL examples
+│   └── images/                        # Visual diagrams and demo assets
+│
+└── src/
+    ├── main/
+    │   ├── java/com/nikunj/library/
+    │   │   ├── LibraryApplication.java# Application entry point (Loads .env)
+    │   │   ├── config/                # SecurityConfig & JwtAuthenticationFilter
+    │   │   ├── controller/            # Auth, Book, Member, Borrow REST Controllers
+    │   │   ├── dto/                   # Request & Response Data Transfer Objects
+    │   │   ├── exception/             # Custom Exceptions & GlobalExceptionHandler
+    │   │   ├── model/                 # JPA Database Entities
+    │   │   ├── repository/            # Spring Data JPA Repositories
+    │   │   └── service/               # Business Logic & Transactional Services
+    │   └── resources/
+    │       └── application.properties # Application properties configuration
+    └── test/
+        └── java/com/nikunj/library/   # Unit and integration test suites
 ```
 
-### 3. Build & Run
+---
+
+## 📋 Prerequisites
+
+Before running the application, make sure you have:
+- **Java 21 JDK** installed (`java -version`)
+- **PostgreSQL 15+** installed and running on `localhost:5432`
+- **Git** installed
+
+---
+
+## ⚙️ Environment Variables
+
+The application reads properties dynamically from a root `.env` file via `dotenv-java`.
+
+| Variable | Description | Default Fallback |
+|---|---|---|
+| `DB_URL` | JDBC Connection URL to PostgreSQL | `jdbc:postgresql://localhost:5432/library` |
+| `DB_USERNAME` | PostgreSQL database username | `postgres` |
+| `DB_PASSWORD` | PostgreSQL database password | *(None / Required)* |
+| `JWT_SECRET` | 256-bit Base64 secret key for HMAC-SHA256 signing | `5F05gEkmG5Gxi6GHqehXUFlsusNdoO0tXnwuK1iUVpQ=` |
+| `JWT_REFRESH_EXPIRATION_MS`| Refresh token lifetime in milliseconds | `604800000` (7 days) |
+| `SERVER_PORT` | HTTP port for the web server | `8080` |
+
+---
+
+## 🗄️ Database Setup
+
+1. Connect to your PostgreSQL instance:
+   ```bash
+   psql -U postgres
+   ```
+2. Create the application database:
+   ```sql
+   CREATE DATABASE library;
+   ```
+3. Hibernate will automatically create and synchronize all tables on startup (`spring.jpa.hibernate.ddl-auto=update`).
+
+---
+
+## 🚀 How to Run Locally
+
+### 1. Clone & Configure
 ```bash
-# Compile and test
+git clone https://github.com/gargnikunj991-ux/library.git
+cd library
+
+# Copy environment template
+cp .env.example .env
+```
+*Edit `.env` and set your PostgreSQL `DB_PASSWORD`.*
+
+### 2. Build & Run
+```bash
+# Using Maven Wrapper (Windows)
+.\mvnw.cmd spring-boot:run
+
+# Using Maven Wrapper (Linux / macOS)
+./mvnw spring-boot:run
+```
+The server will start on **`http://localhost:8080`**.
+
+---
+
+## 🔌 REST API Overview
+
+| Method | Endpoint | Description | Role Required |
+|---|---|---|---|
+| `POST` | `/auth/login` | Authenticate user & receive JWT | Public (`permitAll`) |
+| `POST` | `/auth/register` | Register new system operator | `ADMIN` |
+| `POST` | `/auth/refresh` | Refresh expired access token | Public (`permitAll`) |
+| `POST` | `/auth/logout` | Revoke active refresh token | `ADMIN`, `LIBRARIAN`, `ASSISTANT` |
+| `GET` | `/api/books` | Retrieve all books | `ADMIN`, `LIBRARIAN`, `ASSISTANT` |
+| `GET` | `/api/books/{id}` | Retrieve book by ID | `ADMIN`, `LIBRARIAN`, `ASSISTANT` |
+| `POST` | `/api/books` | Register new book | `ADMIN`, `LIBRARIAN`, `ASSISTANT` |
+| `PUT` | `/api/books/{id}` | Update book details | `ADMIN`, `LIBRARIAN` |
+| `DELETE` | `/api/books/{id}` | Delete book | `ADMIN` |
+| `GET` | `/api/members` | Retrieve all members | `ADMIN`, `LIBRARIAN`, `ASSISTANT` |
+| `GET` | `/api/members/{memberId}` | Retrieve member by ID | `ADMIN`, `LIBRARIAN`, `ASSISTANT` |
+| `POST` | `/api/members` | Register new member | `ADMIN`, `LIBRARIAN`, `ASSISTANT` |
+| `PUT` | `/api/members/{memberId}` | Update member details | `ADMIN`, `LIBRARIAN` |
+| `DELETE` | `/api/members/{memberId}` | Delete member | `ADMIN` |
+| `POST` | `/api/borrow` | Checkout an available book | `ADMIN`, `LIBRARIAN`, `ASSISTANT` |
+| `POST` | `/api/borrow/return/{borrowId}` | Process book return | `ADMIN`, `LIBRARIAN`, `ASSISTANT` |
+
+👉 *For full parameter schemas and error codes, refer to [docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md).*
+
+---
+
+## 💡 Example API Requests & Responses
+
+### 1. User Login (`POST /auth/login`)
+**Request Body**:
+```json
+{
+  "username": "admin",
+  "password": "AdminPassword123!"
+}
+```
+**Response (`200 OK`)**:
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "4a7e9b21-8c34-4d82-bcf2-9e1234567890",
+  "tokenType": "Bearer"
+}
+```
+
+### 2. Borrow a Book (`POST /api/borrow`)
+**Request Headers**: `Authorization: Bearer <ACCESS_TOKEN>`  
+**Request Body**:
+```json
+{
+  "bookId": 1,
+  "memberId": 1
+}
+```
+**Response (`200 OK`)**:
+```json
+{
+  "borrowId": 101,
+  "bookId": 1,
+  "memberName": "Alice Johnson",
+  "bookTitle": "Clean Code",
+  "borrowDate": "2026-08-12",
+  "dueDate": "2026-08-26",
+  "returned": false
+}
+```
+
+---
+
+## ⚠️ Validation & Error Handling
+
+All incoming DTOs are validated using Jakarta Validation constraints. When a rule is violated, the API returns a structured HTTP 400 response:
+
+```json
+[
+  "Email must be a well-formed email address",
+  "Name cannot be blank"
+]
+```
+
+Centralized Exception Mapping (`GlobalExceptionHandler`):
+- `BookNotFoundException` ➔ `404 Not Found` (`"Book Not Found"`)
+- `BookUnavailableException` ➔ `404 Not Found` (`"Book Not available"`)
+- `MemberNotFoundException` ➔ `404 Not Found` (`"Member Not Found"`)
+- `TokenRefreshException` ➔ `401 Unauthorized` (`"Refresh token was expired..."`)
+- `AuthenticationEntryPoint` ➔ `401 Unauthorized` (`{"error": "Unauthorized", ...}`)
+- `AccessDeniedHandler` ➔ `403 Forbidden` (`{"error": "Forbidden", ...}`)
+
+---
+
+## 🧪 Testing Instructions
+
+Run automated unit and integration test suites via Maven:
+
+```bash
+# Validate compilation of test sources
 mvn clean test-compile
 
-# Run application
-mvn spring-boot:run
+# Execute all tests
+mvn test
 ```
-The server will start on `http://localhost:8080`.
+
+For a comprehensive test matrix and manual cURL verification commands, see [docs/TESTING.md](docs/TESTING.md).
 
 ---
 
-## 🚀 Future Roadmap
-- [ ] Add pagination and sorting support (`Pageable`) for Book and Member APIs.
-- [ ] Fine-grained role-based endpoint authorization (`hasRole('ADMIN')`).
-- [ ] Swagger / OpenAPI 3.0 documentation integration.
-- [ ] Docker & Docker Compose setup for database and application containerization.
+## 📈 Future Improvements
+
+- [ ] Add pagination and dynamic sorting (`Pageable`) for book and member catalogs.
+- [ ] Implement automated overdue fine calculation with Spring `@Scheduled` background cron jobs.
+- [ ] Containerize application with Docker & Docker Compose.
+- [ ] Integrate Swagger / OpenAPI 3.0 UI for interactive browser documentation.
 
 ---
 
-## 👤 Author
+## 📚 Full Documentation Index
+
+- 🔌 **[docs/API_DOCUMENTATION.md](docs/API_DOCUMENTATION.md)** — Detailed REST endpoint specifications, schemas & error responses.
+- 🏛️ **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — System layering, design patterns & sequence diagrams.
+- 🗄️ **[docs/DATABASE.md](docs/DATABASE.md)** — Relational ERD diagrams, table definitions & column constraints.
+- 🚀 **[docs/SETUP.md](docs/SETUP.md)** — Zero-assumption local installation & troubleshooting guide.
+- 🧪 **[docs/TESTING.md](docs/TESTING.md)** — Complete test matrices & manual cURL testing scripts.
+- 📊 **[docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)** — Project status, milestone retrospective & engineering takeaways.
+- 🤝 **[CONTRIBUTING.md](CONTRIBUTING.md)** — Contribution standards, Git workflow & branch conventions.
+- 🛡️ **[SECURITY.md](SECURITY.md)** — Security policy, threat model & vulnerability disclosure.
+- 📜 **[CHANGELOG.md](CHANGELOG.md)** — Version history following Keep a Changelog.
+
+---
+
+## 👤 Author & License
+
 **Nikunj Garg**  
-GitHub: [gargnikunj991-ux](https://github.com/gargnikunj991-ux)
+- GitHub: [@gargnikunj991-ux](https://github.com/gargnikunj991-ux)
+
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.

@@ -1,6 +1,6 @@
 # PROJECT_BRAIN.md -- Single Source of Truth
 
-> This file is the single source of truth for the Library Management System project. It tracks the current state, technical decisions, roadmap, and pending tasks.
+> This file is the single source of truth for the Library Management System project. It tracks the current state, technical decisions, roadmap, and project documentation index.
 
 ---
 
@@ -9,55 +9,49 @@
 Build a production-quality **Library Management System** backend using **Spring Boot 4.1.0** and **Java 21**, following clean backend architecture standards.
 
 The goal is to master Spring Boot concepts ground-up:
-* Layered Architecture (Controller → Service → Repository)
+* Layered Architecture (Controller → Service → Repository → PostgreSQL)
 * REST API standards & ResponseEntity design
 * DTO separation & Request Validation
 * Global Exception Handling (`@ControllerAdvice`)
 * JPA Entity Relationships (`@ManyToOne`, `@JoinColumn`)
+* Stateless JWT Security with HMAC-SHA256 & Refresh Token Rotation
 * Database persistence with PostgreSQL
+* Recruiter-ready, enterprise-grade documentation and repository structure
 
 ---
 
 ## 🏗️ 2. Current Architecture & Tech Stack
 
 - **Java 21**
-- **Spring Boot 4.1.0** (Spring Web MVC, Spring Data JPA, Jakarta Validation)
-- **PostgreSQL** (Database)
+- **Spring Boot 4.1.0** (Spring Web MVC, Spring Data JPA, Spring Security, Jakarta Validation)
+- **PostgreSQL 16+** (Database)
 - **Maven** (Dependency & Build Management)
+- **JJWT 0.12.7** (JWT generation and token parsing)
+- **Dotenv Java 3.1.0** (Environment variables configuration)
 
 ---
 
 ## 📈 3. Current Progress & Status
 
-### ✅ Completed Setup & Core Modules
+### ✅ Completed Modules & Milestones (v1.0.0 Stable)
 
 1. **Database & Infrastructure**:
    - [x] PostgreSQL connection (`jdbc:postgresql://localhost:5432/library`)
-   - [x] Environment variables configuration (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD` with default fallbacks) for GitHub security
+   - [x] Environment variables configuration (`DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`, `JWT_REFRESH_EXPIRATION_MS`) via `.env` and `.env.example`
    - [x] Hibernate DDL auto-update (`update`)
-   - [x] Package structuring (`controller`, `service`, `repository`, `model`, `dto`, `exception`)
+   - [x] Clean package structuring (`controller`, `service`, `repository`, `model`, `dto`, `exception`, `config`)
 
 2. **Book Module** (`/api/books`):
    - [x] `Book` entity with `id` (`IDENTITY`), `title`, `author`, `available`
    - [x] `BookRepository` extending `JpaRepository`
    - [x] `BookService` with DTO mapping (`CreateBookRequest`, `BookResponse`)
-   - [x] `BookController` with full CRUD:
-     - `GET /api/books`
-     - `GET /api/books/{id}`
-     - `POST /api/books`
-     - `PUT /api/books/{id}`
-     - `DELETE /api/books/{id}`
+   - [x] `BookController` with full CRUD (GET all, GET by ID, POST, PUT, DELETE)
 
 3. **Member Module** (`/api/members`):
    - [x] `Member` entity with `memberId` (`IDENTITY`), `name`, `email`, `phoneNumber`
    - [x] `MemberRepository` extending `JpaRepository`
    - [x] `MemberService` with DTO mapping (`CreateMemberRequest`, `MemberResponse`)
-   - [x] `MemberController` with full CRUD:
-     - `GET /api/members`
-     - `GET /api/members/{memberId}`
-     - `POST /api/members`
-     - `PUT /api/members/{memberId}`
-     - `DELETE /api/members/{memberId}`
+   - [x] `MemberController` with full CRUD (GET all, GET by ID, POST, PUT, DELETE)
 
 4. **Borrow & Return Module** (`/api/borrow`):
    - [x] `BorrowRecord` entity with `@ManyToOne` relationships (`Book`, `Member`), `borrowDate`, `dueDate`, `returnDate`, `returned`
@@ -67,56 +61,53 @@ The goal is to master Spring Boot concepts ground-up:
      - Availability check (`book.isAvailable()`)
      - Automatic 14-day due date calculation
      - Sets `book.setAvailable(false)` and saves record
-   - [x] `Borrowcontroller` REST endpoint `POST /api/borrow` calling `BorrowService.borrowBook` returning `ResponseEntity<BorrowResponse>`.
+   - [x] `Borrowcontroller` REST endpoint `POST /api/borrow`
    - [x] `BorrowService.returnBook(...)` & `POST /api/borrow/return/{borrowId}`:
      - Record lookup validation (`BorrowRecordNotFoundException`)
      - Sets `returned=true`, `returnDate=now()`, and resets `book.setAvailable(true)`
 
 5. **Validation & Exception Handling**:
    - [x] Input validation annotations (`@NotBlank`, `@Email`, `@NotNull`, `@Valid`)
-   - [x] Custom exceptions: `BookNotFoundException`, `MemberNotFoundException`, `BookUnavailableException`, `BorrowRecordNotFoundException`
+   - [x] Custom exceptions: `BookNotFoundException`, `MemberNotFoundException`, `BookUnavailableException`, `BorrowRecordNotFoundException`, `TokenRefreshException`
    - [x] Centralized `@ControllerAdvice` in `GlobalExceptionHandler`
+   - [x] Response sanitization with `server.error.include-stacktrace=never`
 
-6. **Security & User Model**:
+6. **Security, User Model & Refresh Token Rotation**:
    - [x] `spring-boot-starter-security` added to build dependencies
    - [x] `SecurityConfig.java` enforcing request authentication, disabling CSRF, and using stateless session management (`SessionCreationPolicy.STATELESS`)
-   - [x] `JwtAuthenticationFilter` (no `@Component`) manually instantiated inside `SecurityConfig.securityFilterChain()` to prevent double filter registration
-   - [x] `User` entity mapped to `users` database table with `username`, `password`, and `Role` (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) with setters (`setUsername`, `setPassword`, `setRole`)
-   - [x] `AuthService.registerUser(RegisterRequest request)` implemented with `PasswordEncoder` hashing and database persistence via `UserRepository`
-   - [x] JWT login endpoint (`POST /auth/login`) fully functional — authenticates via `AuthenticationManager`, generates JWT token via `JwtService`
-   - [x] `JwtService` updated to inject `jwt.secret` dynamically via `@Value` instead of hardcoded string
-   - [x] `BorrowService` methods annotated with `@Transactional` for atomic entity state management
-   - [x] `JwtAuthenticationFilter` refactored to use standard SLF4J logging instead of `System.out.println`
-   - [x] `dotenv-java` added to `pom.xml` and loaded in `LibraryApplication.java` via `Dotenv.configure().ignoreIfMissing().load()`
-   - [x] `RefreshToken` entity mapped to `refresh_tokens` table with `id`, `token` (unique), `expiryDate`, `@ManyToOne` `User` relation (`user_id`), and `revoked` flag
-   - [x] `RefreshTokenRepository` created with `findByToken` and `deleteByUser`
-   - [x] `RefreshTokenService` implemented with `createRefreshToken`, `verifyExpiration`, `refreshAccessToken`, and `deleteByUsername`
-   - [x] `POST /auth/refresh` endpoint added in `AuthController` returning renewed access and refresh tokens
-   - [x] `LoginResponse` updated to supply `accessToken`, `refreshToken`, and `tokenType`
-   - [x] `TokenRefreshException` handled globally with `401 Unauthorized` response in `GlobalExceptionHandler`
-   - [x] `POST /auth/logout` endpoint added with role authorization (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) and refresh token revocation (`revoked=true`)
-   - [x] `SecurityConfig.java` updated to permit `/auth/refresh` without authentication
-   - [x] `SecurityConfig.java` configured with `AuthenticationEntryPoint` (`401 Unauthorized` for missing/invalid JWT) and `AccessDeniedHandler` (`403 Forbidden` for insufficient roles)
+   - [x] `JwtAuthenticationFilter` with SLF4J logging
+   - [x] `User` entity with `username`, `password` (BCrypt), and `Role` (`ADMIN`, `LIBRARIAN`, `ASSISTANT`)
+   - [x] `RefreshToken` entity mapped to `refresh_tokens` table with UUID tokens, expiry date, user linkage, and revocation flag
+   - [x] `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh`, and `POST /auth/logout` endpoints
+   - [x] `AuthenticationEntryPoint` (401) and `AccessDeniedHandler` (403) custom JSON handlers
+
+7. **Enterprise Documentation Suite & Repository Standardization**:
+   - [x] `README.md` — Master recruiter-ready project overview
+   - [x] `docs/API_DOCUMENTATION.md` — Complete REST API specification
+   - [x] `docs/ARCHITECTURE.md` — Deep dive into layers, patterns & sequence flows
+   - [x] `docs/DATABASE.md` — Database design, ERD diagrams & table schemas
+   - [x] `docs/SETUP.md` — Step-by-step fresh machine setup & troubleshooting guide
+   - [x] `docs/TESTING.md` — Comprehensive test matrices & cURL test suite
+   - [x] `docs/PROJECT_STATUS.md` — Milestones, retrospective & lessons learned
+   - [x] `docs/images/README.md` — Architecture diagrams & demo walkthrough assets
+   - [x] `.env.example` — Environment template for local development
+   - [x] `CHANGELOG.md` — Keep-a-Changelog semver history
+   - [x] `LICENSE` — MIT License
+   - [x] `CONTRIBUTING.md` — Contribution workflow & coding standards
+   - [x] `SECURITY.md` — Security policy & vulnerability reporting
 
 ---
 
-## 📑 4. Quick Documentation Index
+## 📑 4. Documentation Index
 
-- 📘 [PROJECT_SUMMARY.md](file:///D:/library/library/PROJECT_SUMMARY.md) -- Architecture, package breakdown, technology stack, and domain rules.
-- 🔌 [API_DOCUMENTATION.md](file:///D:/library/library/API_DOCUMENTATION.md) -- Complete REST API reference, request/response DTO schemas, and error codes.
-- 🗄️ [DATABASE_SCHEMA.md](file:///D:/library/library/DATABASE_SCHEMA.md) -- Relational ERD diagram, table definitions, columns, and foreign keys.
-- 📋 [AGENTS.md](file:///D:/library/library/AGENTS.md) -- Coding standards, approval requirements, and documentation maintenance rules for AI agents.
-
----
-
-## 🚀 5. Next Steps & Roadmap
-
-1. **Advanced Book & Member Operations**:
-   - Search books by title / author / category.
-   - Pagination and Sorting support (`Pageable`).
-
-2. **Advanced Authentication & JWT Authorization**:
-   - JWT token authentication filter (validate token on protected endpoints).
-   - Fine-grained role-based access control (Librarian vs Member).
-
-
+- 📘 [README.md](file:///D:/library/library/README.md) -- Master portfolio overview.
+- 🔌 [docs/API_DOCUMENTATION.md](file:///D:/library/library/docs/API_DOCUMENTATION.md) -- Complete REST API reference.
+- 🏛️ [docs/ARCHITECTURE.md](file:///D:/library/library/docs/ARCHITECTURE.md) -- Clean architecture, design patterns & sequence diagrams.
+- 🗄️ [docs/DATABASE.md](file:///D:/library/library/docs/DATABASE.md) -- Relational ERD diagram and database schemas.
+- 🚀 [docs/SETUP.md](file:///D:/library/library/docs/SETUP.md) -- Step-by-step setup guide.
+- 🧪 [docs/TESTING.md](file:///D:/library/library/docs/TESTING.md) -- Testing strategy and test matrix.
+- 📊 [docs/PROJECT_STATUS.md](file:///D:/library/library/docs/PROJECT_STATUS.md) -- Project status & retrospective.
+- 📜 [CHANGELOG.md](file:///D:/library/library/CHANGELOG.md) -- Version history.
+- 🤝 [CONTRIBUTING.md](file:///D:/library/library/CONTRIBUTING.md) -- Contribution guidelines.
+- 🛡️ [SECURITY.md](file:///D:/library/library/SECURITY.md) -- Security policy.
+- 📄 [LICENSE](file:///D:/library/library/LICENSE) -- MIT License.
