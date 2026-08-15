@@ -2,11 +2,15 @@
 
 [![Java](https://img.shields.io/badge/Java-21-orange.svg?style=flat&logo=openjdk)](https://adoptium.net/)
 [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.0-brightgreen.svg?style=flat&logo=springboot)](https://spring.io/projects/spring-boot)
+[![OpenAPI](https://img.shields.io/badge/Swagger-OpenAPI%203.0-green.svg?style=flat&logo=swagger)](http://localhost:8080/swagger-ui/index.html)
+[![JUnit 5](https://img.shields.io/badge/JUnit5-28%20Passed-success.svg?style=flat&logo=junit5)](docs/TESTING.md)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-blue.svg?style=flat&logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Status](https://img.shields.io/badge/Status-Complete%20v1.0.0-success.svg)](docs/PROJECT_STATUS.md)
 
-> A production-grade RESTful Library Management System backend built with **Java 21**, **Spring Boot 4.1.0**, **Spring Data JPA**, **Spring Security (Stateless JWT + Refresh Token Rotation)**, and **PostgreSQL**.
+> A production-grade RESTful Library Management System backend built with **Java 21**, **Spring Boot 4.1.0**, **Spring Data JPA**, **Spring Security (Stateless JWT + Refresh Token Rotation)**, **OpenAPI Swagger 3.0 UI**, and **PostgreSQL**.
+> 
+> **Interactive Swagger UI**: `http://localhost:8080/swagger-ui/index.html` (Supports JWT Bearer Token Authorization)
 
 ---
 

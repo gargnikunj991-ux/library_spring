@@ -4,11 +4,22 @@ This document outlines all RESTful API endpoints, request payloads, response for
 
 ---
 
+## 📖 Interactive Swagger 3.0 / OpenAPI Documentation
+
+When the application is running locally, interactive API documentation with built-in JWT authorization is available at:
+- **Swagger UI**: [`http://localhost:8080/swagger-ui/index.html`](http://localhost:8080/swagger-ui/index.html)
+- **OpenAPI JSON Spec**: [`http://localhost:8080/v3/api-docs`](http://localhost:8080/v3/api-docs)
+
+> **Testing via Swagger UI**: Click the **Authorize** button on top of the Swagger UI page, paste your Bearer JWT Token obtained from `/auth/login`, and execute all protected endpoints directly from your browser!
+
+---
+
 ## 🔒 Security & Authentication
 
 Spring Security (`SecurityConfig.java`) is enabled across all API endpoints:
 - **CSRF**: Disabled (`csrf.disable()`)
-- **Authentication**: Required (`.anyRequest().authenticated()`)
+- **Public Endpoints**: `/auth/login`, `/auth/refresh`, `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html`
+- **Authentication**: Required (`.anyRequest().authenticated()`) for protected endpoints.
 - **Authorization**: Credentials must be supplied via HTTP Authentication for protected endpoints.
 
 ### 🔑 Authentication Endpoints (`/auth`)

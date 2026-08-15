@@ -50,6 +50,9 @@ public class BorrowResponse {
   public boolean getReturned(){
     return returned;
   }
+  public boolean isReturned(){
+    return returned;
+  }
   public void setReturned(boolean returned){
     this.returned = returned;
   }

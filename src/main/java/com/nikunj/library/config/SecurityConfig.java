@@ -54,7 +54,7 @@ public class SecurityConfig {
         );
 
         http.authorizeHttpRequests(auth -> auth
-            .requestMatchers("/auth/login", "/auth/refresh").permitAll()
+            .requestMatchers("/auth/login", "/auth/refresh", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             .requestMatchers("/auth/register").hasRole("ADMIN")
             .requestMatchers(HttpMethod.POST, "/auth/logout").hasAnyRole("ADMIN", "LIBRARIAN", "ASSISTANT")
             .requestMatchers(HttpMethod.DELETE,"/api/books/{id}").hasRole("ADMIN")

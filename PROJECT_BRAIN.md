@@ -81,7 +81,20 @@ The goal is to master Spring Boot concepts ground-up:
    - [x] `POST /auth/login`, `POST /auth/register`, `POST /auth/refresh`, and `POST /auth/logout` endpoints
    - [x] `AuthenticationEntryPoint` (401) and `AccessDeniedHandler` (403) custom JSON handlers
 
-7. **Enterprise Documentation Suite & Repository Standardization**:
+7. **Interactive OpenAPI 3.0 & Swagger UI Integration**:
+   - [x] Added `springdoc-openapi-starter-webmvc-ui:2.5.0`
+   - [x] Configured `OpenApiConfig.java` with metadata and JWT Bearer Security Scheme
+   - [x] Configured `SecurityConfig.java` route access for `/swagger-ui/**`, `/v3/api-docs/**`, and `/swagger-ui.html`
+
+8. **Comprehensive Automated Test Suite (28 Tests)**:
+   - [x] Configured H2 in-memory test database in `src/test/resources/application.properties`
+   - [x] `BorrowServiceTest`: Unit tests covering borrow, return, availability locks, and custom exceptions
+   - [x] `RefreshTokenServiceTest`: Unit tests covering token creation, verification, revocation, and rotation
+   - [x] `BookServiceTest`: Unit tests covering book CRUD operations and not found exceptions
+   - [x] `MemberServiceTest`: Unit tests covering member registry and lookup validation
+   - [x] `AuthServiceTest`: Unit tests covering registration, login, token generation, and logout
+
+9. **Enterprise Documentation Suite & Repository Standardization**:
    - [x] `README.md` — Master recruiter-ready project overview
    - [x] `docs/API_DOCUMENTATION.md` — Complete REST API specification
    - [x] `docs/ARCHITECTURE.md` — Deep dive into layers, patterns & sequence flows

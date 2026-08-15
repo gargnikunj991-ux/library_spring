@@ -40,10 +40,12 @@ Centralized Exception Handling is managed across all controllers using `@Control
 - **Framework**: Spring Boot 4.1.0
 - **Web**: Spring MVC (`spring-boot-starter-webmvc`)
 - **Security**: Spring Security (`spring-boot-starter-security`)
+- **API Documentation**: SpringDoc OpenAPI 3.0 / Swagger UI (`springdoc-openapi-starter-webmvc-ui:2.5.0`)
 - **Environment**: Dotenv Java (`dotenv-java`)
 - **Data Persistence**: Spring Data JPA (`spring-boot-starter-data-jpa`), Hibernate
-- **Database**: PostgreSQL (Driver: `org.postgresql.Driver`)
+- **Database**: PostgreSQL (Driver: `org.postgresql.Driver`), H2 In-Memory (Test scope)
 - **Validation**: Jakarta Validation (`spring-boot-starter-validation`)
+- **Testing**: JUnit 5, Mockito (28 automated Unit & Integration Tests)
 - **Build Tool**: Maven
 
 ---
@@ -56,6 +58,7 @@ Base package: `com.nikunj.library`
 com.nikunj.library
 ├── LibraryApplication.java           # Main Spring Boot Application Entry Point (Loads .env properties via Dotenv)
 ├── config/                           # Security & Application Configuration
+│   ├── OpenApiConfig.java            # Swagger 3.0 OpenAPI metadata & JWT Bearer Security Scheme configuration
 │   ├── SecurityConfig.java           # Spring Security filter chain setup (stateless JWT, 401 AuthenticationEntryPoint, 403 AccessDeniedHandler)
 │   └── JwtAuthenticationFilter.java  # JWT token validation filter (OncePerRequestFilter, no @Component)
 ├── controller/                       # REST Controller Layer
