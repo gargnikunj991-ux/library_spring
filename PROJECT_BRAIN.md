@@ -126,3 +126,53 @@ The goal is to master Spring Boot concepts ground-up:
 - 🤝 [CONTRIBUTING.md](file:///D:/library/library/CONTRIBUTING.md) -- Contribution guidelines.
 - 🛡️ [SECURITY.md](file:///D:/library/library/SECURITY.md) -- Security policy.
 - 📄 [LICENSE](file:///D:/library/library/LICENSE) -- MIT License.
+
+---
+
+## 🚀 5. LibroSphere Enterprise Transformation Ledger
+
+> Target: Rebrand & elevate from "Library Management System" to **LibroSphere — High-Concurrency Asset Lending & Reservation Engine**.  
+> Master Blueprint Reference: [LIBROSPHERE_TRANSFORMATION_BLUEPRINT.md](file:///D:/library/library/LIBROSPHERE_TRANSFORMATION_BLUEPRINT.md)
+
+### 📊 Progress Tracker (Current Status: ~40% Complete | 33/33 Tests Passing)
+
+* [x] **Phase 1: Relational Multi-Copy Inventory Modeling (Step 1)**
+  - Replaced naive `boolean available` with `@Column total_copies` and `available_copies`.
+  - Added `@Min(1)` validation in `CreateBookRequest`.
+  - Backwards-compatible `isAvailable()` helper maintained.
+* [x] **Phase 2: Database Row-Level Locking & Concurrency Prevention (Step 2)**
+  - Implemented `@Lock(LockModeType.PESSIMISTIC_WRITE)` (`SELECT ... FOR UPDATE`) in `BookRepository.findByIdForUpdate()`.
+  - `BorrowService.borrowBook(...)` acquires row lock, validates copies > 0, and decrements atomically.
+  - Eliminated TOCTOU race conditions under high concurrent volume.
+* [x] **Phase 3: Multi-Threaded Stress Test Suite (Step 3)**
+  - Created `BorrowConcurrencyIntegrationTest.java` running 10 concurrent threads using `CountDownLatch` and `ExecutorService`.
+  - Proved zero double-checkouts (1 success, 9 rejections, 0 inventory underflow).
+  - Pushed to `origin/main` (Commit `f5e2c60`).
+
+---
+
+### 📋 Remaining 6-Commit Execution Blueprint
+
+| Commit | Conventional Commit Message | Implementation Scope | Time Est. |
+| :---: | :--- | :--- | :---: |
+| **Commit 1** | `feat(reservation): implement FIFO waitlist queue and auto-assignment on return` | • `BookReservation` entity (`WAITING`, `NOTIFIED_READY`, `CLAIMED`, `EXPIRED`, `CANCELLED`)<br>• `BookReservationRepository` with FIFO query (`findFirstByBookIdAndStatusOrderByReservedAtAsc`)<br>• `ReservationService` & `ReservationController`<br>• Update `BorrowService.returnBook(...)` to lock returned books for next-in-line reservation with a 48h pickup deadline instead of releasing to public | ~30 min |
+| **Commit 2** | `test(reservation): add integration test suite for waitlist state transitions` | • Integration tests for FIFO waitlist queue transitions<br>• Test joining waitlist when copies == 0<br>• Test auto-notification and 48-hour pickup window enforcement | ~15 min |
+| **Commit 3** | `feat(worker): implement nightly overdue fine reconciliation with @Scheduled cron` | • `FineRecord` entity (tracks accrued overdue fines & payment status)<br>• `FineRecordRepository`<br>• `@EnableScheduling` & `OverdueReconciliationWorker` running nightly at midnight (`0 0 0 * * *`) calculating ₹10/day penalty idempotently | ~25 min |
+| **Commit 4** | `perf(db): add composite B-Tree indexes on book catalog and worker test suite` | • Automated unit/integration tests for overdue reconciliation worker<br>• Add PostgreSQL composite B-Tree indexes on `books(title, author)` for sub-millisecond lookups | ~15 min |
+| **Commit 5** | `ci(devops): add multi-stage Dockerfile, docker-compose, and GitHub Actions workflow` | • Multi-stage `Dockerfile` (Eclipse Temurin JRE 21 lean container)<br>• `docker-compose.yml` (LibroSphere backend + PostgreSQL 16)<br>• `.github/workflows/ci.yml` (Automated build & test on every push) | ~20 min |
+| **Commit 6** | `docs(portfolio): finalize LibroSphere architecture docs and live Railway deployment` | • Deploy backend live to Railway (live Swagger UI)<br>• Synchronize all project markdown files (`README.md`, `API_DOCUMENTATION.md`)<br>• Update resume PDF (`newjava/real/resume.pdf`) and portfolio site (`index.html`) with senior-level bullet points | ~25 min |
+
+---
+
+### 💼 Target Resume Bullet Points (Ready for Deployment)
+
+```text
+LibroSphere — High-Concurrency Asset Lending & Reservation Engine
+Java 21, Spring Boot 3, PostgreSQL 16, Spring Security, Docker, JUnit 5, Railway
+
+• Engineered a high-throughput digital asset lending and reservation engine managing multi-copy inventory lifecycles, member loans, and FIFO waitlist queues.
+• Eliminated double-checkout TOCTOU race conditions on limited inventory copies using pessimistic database row locking (SELECT ... FOR UPDATE) and atomic inventory decrements under high concurrency.
+• Designed an automated FIFO waitlist reservation queue that locks returned assets for next-in-line members with a 48-hour pickup expiry window before public release.
+• Built an automated nightly reconciliation cron worker (@Scheduled) calculating progressive overdue penalties and tracking member liabilities without blocking HTTP request threads.
+• Containerized application with multi-stage Docker, built automated GitHub Actions CI/CD pipeline, and deployed live backend on Railway with interactive Swagger UI and 40+ tests including multi-threaded concurrency suites.
+```
