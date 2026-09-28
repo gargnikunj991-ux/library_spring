@@ -45,7 +45,7 @@ Centralized Exception Handling is managed across all controllers using `@Control
 - **Data Persistence**: Spring Data JPA (`spring-boot-starter-data-jpa`), Hibernate
 - **Database**: PostgreSQL (Driver: `org.postgresql.Driver`), H2 In-Memory (Test scope)
 - **Validation**: Jakarta Validation (`spring-boot-starter-validation`)
-- **Testing**: JUnit 5, Mockito (28 automated Unit & Integration Tests)
+- **Testing**: JUnit 5, Mockito (33 automated Unit & Concurrency Integration Tests)
 - **Build Tool**: Maven
 
 ---
@@ -75,21 +75,21 @@ com.nikunj.library
 │   ├── MemberService.java            # Member CRUD logic & DTO mapping
 │   └── RefreshTokenService.java      # Refresh token creation, expiry verification, and rotation logic
 ├── repository/                       # Data Access Layer (Spring Data JPA)
-│   ├── BookRepository.java           # JpaRepository<Book, Long>
+│   ├── BookRepository.java           # JpaRepository<Book, Long> with pessimistic write lock (findByIdForUpdate)
 │   ├── BorrowRecordRepository.java   # JpaRepository<BorrowRecord, Long>
 │   ├── MemberRepository.java         # JpaRepository<Member, Long>
 │   ├── RefreshTokenRepository.java   # JpaRepository<RefreshToken, Long>
 │   └── UserRepository.java           # JpaRepository<User, Long>
 ├── model/                            # JPA Database Entities
-│   ├── Book.java                     # "books" table entity
+│   ├── Book.java                     # "books" table entity (totalCopies, availableCopies)
 │   ├── Member.java                   # "members" table entity
 │   ├── BorrowRecord.java             # "borrow_records" table entity with Foreign Keys
 │   ├── RefreshToken.java             # "refresh_tokens" table entity for JWT refresh token rotation (@ManyToOne User relation)
 │   └── User.java                     # "users" table entity for authentication (Role: ADMIN, LIBRARIAN, ASSISTANT)
 ├── dto/                              # Data Transfer Objects (API Contracts)
-│   ├── BookResponse.java             # Outbound DTO for Book responses
+│   ├── BookResponse.java             # Outbound DTO for Book responses (totalCopies, availableCopies, available)
 │   ├── BorrowResponse.java           # Outbound DTO for borrow transactions
-│   ├── CreateBookRequest.java        # Inbound DTO for creating/updating Books
+│   ├── CreateBookRequest.java        # Inbound DTO for creating/updating Books (totalCopies validation)
 │   ├── CreateBorrowRequest.java      # Inbound DTO for borrowing a book
 │   ├── CreateMemberRequest.java      # Inbound DTO for creating/updating Members
 │   ├── LoginRequest.java             # Inbound DTO for authentication
@@ -110,18 +110,19 @@ com.nikunj.library
 
 ## 📌 Core Domain Rules & Business Logic
 
-1. **Book Availability & Borrowing (`POST /api/borrow`)**:
-   - Every `Book` has an `available` boolean flag.
-   - When a book is added, `available` defaults to `true` (unless set in request).
+1. **Book Inventory & Concurrency-Safe Borrowing (`POST /api/borrow`)**:
+   - Every `Book` maintains `totalCopies` and `availableCopies`.
+   - When a book is added, `availableCopies` defaults to `totalCopies` (at least 1).
    - When a book is borrowed via `POST /api/borrow`, `Borrowcontroller` delegates to `BorrowService.borrowBook()`.
-   - The system verifies `book.isAvailable()`. If false, `BookUnavailableException` is thrown.
-   - Upon successful borrow, `book.setAvailable(false)` is saved, and a `BorrowRecord` is created with a `borrowDate` (today) and `dueDate` (today + 14 days).
+   - The transaction acquires a **Pessimistic Write Lock (`SELECT ... FOR UPDATE`)** via `BookRepository.findByIdForUpdate(bookId)` to eliminate TOCTOU race conditions.
+   - The system verifies `book.getAvailableCopies() > 0`. If copies are exhausted, `BookUnavailableException` is thrown.
+   - Upon successful borrow, `availableCopies` is decremented atomically by 1, and a `BorrowRecord` is created with `borrowDate` (today) and `dueDate` (today + 14 days).
 
 2. **Book Return (`POST /api/borrow/return/{borrowId}`)**:
    - When a book is returned via `POST /api/borrow/return/{borrowId}`, `BorrowService.returnBook()` finds the record.
    - If missing, `BorrowRecordNotFoundException` is thrown.
    - Sets `returned = true` and `returnDate = LocalDate.now()`.
-   - Resets the associated `Book` entity's `available` flag to `true` (`book.setAvailable(true)`).
+   - Locks the associated `Book` entity and safely increments `availableCopies` by 1 (capped at `totalCopies`).
 
 3. **Security, User Registration & Refresh Token Rotation**:
    - `SecurityConfig` configures `SecurityFilterChain` to disable CSRF, enforce stateless session management (`SessionCreationPolicy.STATELESS`), and configure explicit exception handling:

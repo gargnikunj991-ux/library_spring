@@ -1,14 +1,20 @@
 package com.nikunj.library.dto;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 
 public class CreateBookRequest {
     
     @NotBlank(message = "Title is mandatory")
     private String title;
+
     @NotBlank(message = "Author is mandatory")
     private String author;
-    private boolean available;
+
+    @Min(value = 1, message = "Total copies must be at least 1")
+    private Integer totalCopies = 1;
+
+    private boolean available = true;
 
     public String getTitle() {
         return title;
@@ -26,7 +32,15 @@ public class CreateBookRequest {
         this.author = author;
     }
 
-     public boolean isAvailable() {
+    public Integer getTotalCopies() {
+        return totalCopies;
+    }
+
+    public void setTotalCopies(Integer totalCopies) {
+        this.totalCopies = totalCopies;
+    }
+
+    public boolean isAvailable() {
         return available;
     }
 

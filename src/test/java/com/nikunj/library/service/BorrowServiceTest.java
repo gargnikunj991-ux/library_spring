@@ -58,7 +58,8 @@ public class BorrowServiceTest {
         sampleBook.setId(10L);
         sampleBook.setTitle("Effective Java");
         sampleBook.setAuthor("Joshua Bloch");
-        sampleBook.setAvailable(true);
+        sampleBook.setTotalCopies(1);
+        sampleBook.setAvailableCopies(1);
 
         borrowRequest = new CreateBorrowRequest();
         borrowRequest.setMemberId(1L);
@@ -69,7 +70,7 @@ public class BorrowServiceTest {
     @DisplayName("Borrow Book: Success when member and book exist and book is available")
     void testBorrowBook_Success() {
         when(memberRepository.findById(1L)).thenReturn(Optional.of(sampleMember));
-        when(bookRepository.findById(10L)).thenReturn(Optional.of(sampleBook));
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(sampleBook));
 
         BorrowRecord savedRecord = new BorrowRecord();
         savedRecord.setBorrowId(100L);
@@ -88,6 +89,7 @@ public class BorrowServiceTest {
         assertEquals("Effective Java", response.getBookTitle());
         assertEquals("John Doe", response.getMemberName());
         assertFalse(response.isReturned());
+        assertEquals(0, sampleBook.getAvailableCopies());
         assertFalse(sampleBook.isAvailable());
 
         verify(bookRepository, times(1)).save(sampleBook);
@@ -108,7 +110,7 @@ public class BorrowServiceTest {
     @DisplayName("Borrow Book: Throws BookNotFoundException when book ID does not exist")
     void testBorrowBook_BookNotFound() {
         when(memberRepository.findById(1L)).thenReturn(Optional.of(sampleMember));
-        when(bookRepository.findById(10L)).thenReturn(Optional.empty());
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.empty());
 
         assertThrows(BookNotFoundException.class, () -> borrowService.borrowBook(borrowRequest));
         verify(bookRepository, never()).save(any());
@@ -118,9 +120,9 @@ public class BorrowServiceTest {
     @Test
     @DisplayName("Borrow Book: Throws BookUnavailableException when book is already borrowed")
     void testBorrowBook_BookUnavailable() {
-        sampleBook.setAvailable(false);
+        sampleBook.setAvailableCopies(0);
         when(memberRepository.findById(1L)).thenReturn(Optional.of(sampleMember));
-        when(bookRepository.findById(10L)).thenReturn(Optional.of(sampleBook));
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(sampleBook));
 
         assertThrows(BookUnavailableException.class, () -> borrowService.borrowBook(borrowRequest));
         verify(borrowRecordRepository, never()).save(any());
@@ -129,7 +131,7 @@ public class BorrowServiceTest {
     @Test
     @DisplayName("Return Book: Successfully marks record returned and resets book availability")
     void testReturnBook_Success() {
-        sampleBook.setAvailable(false);
+        sampleBook.setAvailableCopies(0);
 
         BorrowRecord record = new BorrowRecord();
         record.setBorrowId(100L);
@@ -140,11 +142,13 @@ public class BorrowServiceTest {
         record.setReturned(false);
 
         when(borrowRecordRepository.findById(100L)).thenReturn(Optional.of(record));
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(sampleBook));
 
         BorrowResponse response = borrowService.returnBook(100L);
 
         assertNotNull(response);
         assertTrue(response.isReturned());
+        assertEquals(1, sampleBook.getAvailableCopies());
         assertTrue(sampleBook.isAvailable());
         assertTrue(record.isReturned());
         assertEquals(LocalDate.now(), record.getReturnDate());
@@ -159,5 +163,54 @@ public class BorrowServiceTest {
         when(borrowRecordRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThrows(BorrowRecordNotFoundException.class, () -> borrowService.returnBook(999L));
+    }
+
+    @Test
+    @DisplayName("Borrow Book: Multi-copy book decrements available copies by 1 and remains available")
+    void testBorrowBook_MultipleCopies_DecrementOnlyOne() {
+        sampleBook.setTotalCopies(5);
+        sampleBook.setAvailableCopies(5);
+
+        when(memberRepository.findById(1L)).thenReturn(Optional.of(sampleMember));
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(sampleBook));
+
+        BorrowRecord savedRecord = new BorrowRecord();
+        savedRecord.setBorrowId(101L);
+        savedRecord.setMember(sampleMember);
+        savedRecord.setBook(sampleBook);
+        savedRecord.setBorrowDate(LocalDate.now());
+        savedRecord.setDueDate(LocalDate.now().plusDays(14));
+        savedRecord.setReturned(false);
+
+        when(borrowRecordRepository.save(any(BorrowRecord.class))).thenReturn(savedRecord);
+
+        BorrowResponse response = borrowService.borrowBook(borrowRequest);
+
+        assertNotNull(response);
+        assertEquals(4, sampleBook.getAvailableCopies());
+        assertTrue(sampleBook.isAvailable());
+        verify(bookRepository, times(1)).save(sampleBook);
+    }
+
+    @Test
+    @DisplayName("Return Book: Available copies cannot exceed total copies")
+    void testReturnBook_CannotExceedTotalCopies() {
+        sampleBook.setTotalCopies(3);
+        sampleBook.setAvailableCopies(3);
+
+        BorrowRecord record = new BorrowRecord();
+        record.setBorrowId(102L);
+        record.setMember(sampleMember);
+        record.setBook(sampleBook);
+        record.setReturned(false);
+
+        when(borrowRecordRepository.findById(102L)).thenReturn(Optional.of(record));
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(sampleBook));
+
+        BorrowResponse response = borrowService.returnBook(102L);
+
+        assertNotNull(response);
+        assertEquals(3, sampleBook.getAvailableCopies());
+        verify(bookRepository, times(1)).save(sampleBook);
     }
 }

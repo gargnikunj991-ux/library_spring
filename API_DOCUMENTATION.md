@@ -117,12 +117,16 @@ Base Path: `/api/books`
     "id": 1,
     "title": "Clean Code",
     "author": "Robert C. Martin",
+    "totalCopies": 5,
+    "availableCopies": 4,
     "available": true
   },
   {
     "id": 2,
     "title": "Spring Boot in Action",
     "author": "Craig Walls",
+    "totalCopies": 2,
+    "availableCopies": 0,
     "available": false
   }
 ]
@@ -144,6 +148,8 @@ Base Path: `/api/books`
   "id": 1,
   "title": "Clean Code",
   "author": "Robert C. Martin",
+  "totalCopies": 5,
+  "availableCopies": 4,
   "available": true
 }
 ```
@@ -153,18 +159,19 @@ Base Path: `/api/books`
 ### 🔹 1.3 Create New Book
 - **HTTP Method**: `POST`
 - **Path**: `/api/books`
-- **Description**: Registers a new book.
+- **Description**: Registers a new book into inventory.
 - **Request Body**: `CreateBookRequest` (JSON)
 ```json
 {
   "title": "Effective Java",
   "author": "Joshua Bloch",
-  "available": true
+  "totalCopies": 3
 }
 ```
 - **Validation Rules**:
   - `title`: `@NotBlank` (Cannot be empty or null)
   - `author`: `@NotBlank` (Cannot be empty or null)
+  - `totalCopies`: `@Min(1)` (Must be at least 1)
 - **Response**:
   - `200 OK` with created `BookResponse`.
   - `400 Bad Request` if validation fails (returns list of validation error messages).
@@ -174,6 +181,8 @@ Base Path: `/api/books`
   "id": 3,
   "title": "Effective Java",
   "author": "Joshua Bloch",
+  "totalCopies": 3,
+  "availableCopies": 3,
   "available": true
 }
 ```

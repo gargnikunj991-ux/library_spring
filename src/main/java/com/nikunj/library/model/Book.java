@@ -1,5 +1,6 @@
 package com.nikunj.library.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -13,9 +14,18 @@ public class Book {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false)
     private String title;
+
+    @Column(nullable = false)
     private String author;
-    private boolean available;
+
+    @Column(name = "total_copies", nullable = false)
+    private int totalCopies = 1;
+
+    @Column(name = "available_copies", nullable = false)
+    private int availableCopies = 1;
 
     public Long getId() {
         return id;
@@ -41,11 +51,32 @@ public class Book {
         this.author = author;
     }
 
+    public int getTotalCopies() {
+        return totalCopies;
+    }
+
+    public void setTotalCopies(int totalCopies) {
+        this.totalCopies = totalCopies;
+    }
+
+    public int getAvailableCopies() {
+        return availableCopies;
+    }
+
+    public void setAvailableCopies(int availableCopies) {
+        this.availableCopies = availableCopies;
+    }
+
     public boolean isAvailable() {
-        return available;
+        return availableCopies > 0;
     }
 
     public void setAvailable(boolean available) {
-        this.available = available;
+        if (available && this.availableCopies == 0) {
+            this.availableCopies = 1;
+        } else if (!available) {
+            this.availableCopies = 0;
+        }
     }
 }
+

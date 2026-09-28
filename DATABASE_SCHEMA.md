@@ -43,9 +43,10 @@ Mapped to Entity: `com.nikunj.library.model.Book`
 | Column Name | Data Type | JPA Annotation | Constraints | Description |
 |---|---|---|---|---|
 | `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for each book |
-| `title` | `VARCHAR(255)` | Field: `title` | Nullable | Title of the book |
-| `author` | `VARCHAR(255)` | Field: `author` | Nullable | Author name |
-| `available` | `BOOLEAN` | Field: `available` | NOT NULL | `true` if available for borrow, `false` if borrowed |
+| `title` | `VARCHAR(255)` | Field: `title` | NOT NULL | Title of the book |
+| `author` | `VARCHAR(255)` | Field: `author` | NOT NULL | Author name |
+| `total_copies` | `INTEGER` | Field: `totalCopies` | NOT NULL, Default `1` | Total physical/digital inventory copies |
+| `available_copies` | `INTEGER` | Field: `availableCopies` | NOT NULL, Default `1` | Number of currently available copies |
 
 **JPA Mapping (`Book.java`)**:
 ```java
@@ -55,9 +56,18 @@ public class Book {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    
+    @Column(nullable = false)
     private String title;
+
+    @Column(nullable = false)
     private String author;
-    private boolean available;
+
+    @Column(name = "total_copies", nullable = false)
+    private int totalCopies = 1;
+
+    @Column(name = "available_copies", nullable = false)
+    private int availableCopies = 1;
 }
 ```
 

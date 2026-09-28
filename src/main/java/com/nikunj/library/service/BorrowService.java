@@ -21,12 +21,18 @@ import com.nikunj.library.repository.MemberRepository;
 
 @Service
 public class BorrowService {
-    @Autowired
-    private BookRepository bookRepository;
-    @Autowired
-    private MemberRepository memberRepository;
-    @Autowired
-    private BorrowRecordRepository borrowRecordRepository;
+
+    private final BookRepository bookRepository;
+    private final MemberRepository memberRepository;
+    private final BorrowRecordRepository borrowRecordRepository;
+
+    public BorrowService(BookRepository bookRepository,
+                         MemberRepository memberRepository,
+                         BorrowRecordRepository borrowRecordRepository) {
+        this.bookRepository = bookRepository;
+        this.memberRepository = memberRepository;
+        this.borrowRecordRepository = borrowRecordRepository;
+    }
 
     @Transactional
     public BorrowResponse borrowBook(CreateBorrowRequest request) {
@@ -37,14 +43,18 @@ public class BorrowService {
         Member member = memberRepository.findById(memberId)
                 .orElseThrow(() -> new MemberNotFoundException("Member not found"));
 
-        // Find book
-        Book book = bookRepository.findById(bookId)
+        // Find book with PESSIMISTIC_WRITE lock
+        Book book = bookRepository.findByIdForUpdate(bookId)
                 .orElseThrow(() -> new BookNotFoundException("Book not found"));
 
         // Check availability
-        if (!book.isAvailable()) {
+        if (book.getAvailableCopies() <= 0) {
             throw new BookUnavailableException("Book is currently unavailable");
         }
+
+        // Atomically decrement available copies
+        book.setAvailableCopies(book.getAvailableCopies() - 1);
+        bookRepository.save(book);
 
         // Create BorrowRecord
         BorrowRecord borrowRecord = new BorrowRecord();
@@ -58,12 +68,6 @@ public class BorrowService {
         borrowRecord.setDueDate(LocalDate.now().plusDays(14));
         // Set returned = false
         borrowRecord.setReturned(false);
-
-        // Mark book unavailable
-        book.setAvailable(false);
-
-        // Save Book
-        bookRepository.save(book);
 
         // Save BorrowRecord
         BorrowRecord savedRecord = borrowRecordRepository.save(borrowRecord);
@@ -92,8 +96,9 @@ public class BorrowService {
 
             Book book = borrowRecord.getBook();
             if (book != null) {
-                book.setAvailable(true);
-                bookRepository.save(book);
+                Book lockedBook = bookRepository.findByIdForUpdate(book.getId()).orElse(book);
+                lockedBook.setAvailableCopies(Math.min(lockedBook.getTotalCopies(), lockedBook.getAvailableCopies() + 1));
+                bookRepository.save(lockedBook);
             }
 
             borrowRecordRepository.save(borrowRecord);

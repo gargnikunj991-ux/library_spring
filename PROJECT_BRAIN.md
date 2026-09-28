@@ -42,9 +42,9 @@ The goal is to master Spring Boot concepts ground-up:
    - [x] Clean package structuring (`controller`, `service`, `repository`, `model`, `dto`, `exception`, `config`)
 
 2. **Book Module** (`/api/books`):
-   - [x] `Book` entity with `id` (`IDENTITY`), `title`, `author`, `available`
-   - [x] `BookRepository` extending `JpaRepository`
-   - [x] `BookService` with DTO mapping (`CreateBookRequest`, `BookResponse`)
+   - [x] `Book` entity with `id` (`IDENTITY`), `title`, `author`, `totalCopies`, `availableCopies`
+   - [x] `BookRepository` extending `JpaRepository` with `@Lock(LockModeType.PESSIMISTIC_WRITE)` `findByIdForUpdate`
+   - [x] `BookService` with DTO mapping (`CreateBookRequest`, `BookResponse`) supporting multi-copy inventory
    - [x] `BookController` with full CRUD (GET all, GET by ID, POST, PUT, DELETE)
 
 3. **Member Module** (`/api/members`):
@@ -58,13 +58,14 @@ The goal is to master Spring Boot concepts ground-up:
    - [x] `BorrowRecordRepository` extending `JpaRepository`
    - [x] `BorrowService.borrowBook(...)`:
      - Member & Book lookup validation
-     - Availability check (`book.isAvailable()`)
+     - Concurrency-safe Pessimistic Write Lock (`findByIdForUpdate`)
+     - Availability check (`book.getAvailableCopies() > 0`)
      - Automatic 14-day due date calculation
-     - Sets `book.setAvailable(false)` and saves record
+     - Atomic decrement of `availableCopies`
    - [x] `Borrowcontroller` REST endpoint `POST /api/borrow`
    - [x] `BorrowService.returnBook(...)` & `POST /api/borrow/return/{borrowId}`:
      - Record lookup validation (`BorrowRecordNotFoundException`)
-     - Sets `returned=true`, `returnDate=now()`, and resets `book.setAvailable(true)`
+     - Sets `returned=true`, `returnDate=now()`, and safely increments `book.availableCopies`
 
 5. **Validation & Exception Handling**:
    - [x] Input validation annotations (`@NotBlank`, `@Email`, `@NotNull`, `@Valid`)
@@ -86,8 +87,9 @@ The goal is to master Spring Boot concepts ground-up:
    - [x] Configured `OpenApiConfig.java` with metadata and JWT Bearer Security Scheme
    - [x] Configured `SecurityConfig.java` route access for `/swagger-ui/**`, `/v3/api-docs/**`, and `/swagger-ui.html`
 
-8. **Comprehensive Automated Test Suite (28 Tests)**:
+8. **Comprehensive Automated Test Suite (33 Tests)**:
    - [x] Configured H2 in-memory test database in `src/test/resources/application.properties`
+   - [x] `BorrowConcurrencyIntegrationTest`: Multi-threaded stress test with 10 concurrent threads (`CountDownLatch` & `ExecutorService`) proving zero double-checkouts under contention
    - [x] `BorrowServiceTest`: Unit tests covering borrow, return, availability locks, and custom exceptions
    - [x] `RefreshTokenServiceTest`: Unit tests covering token creation, verification, revocation, and rotation
    - [x] `BookServiceTest`: Unit tests covering book CRUD operations and not found exceptions
