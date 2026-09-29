@@ -63,5 +63,29 @@ public ResponseEntity<String> handleException(TokenRefreshException ex){
     );
 }
 
+@ExceptionHandler(ReservationNotFoundException.class)
+public ResponseEntity<String> handleException(ReservationNotFoundException ex){
+    return new ResponseEntity<>(
+        "Reservation Not Found",
+        HttpStatus.NOT_FOUND
+    );
+}
+
+@ExceptionHandler(DuplicateReservationException.class)
+public ResponseEntity<String> handleException(DuplicateReservationException ex){
+    return new ResponseEntity<>(
+        ex.getMessage(),
+        HttpStatus.CONFLICT
+    );
+}
+
+@ExceptionHandler(IllegalStateException.class)
+public ResponseEntity<String> handleException(IllegalStateException ex){
+    return new ResponseEntity<>(
+        ex.getMessage(),
+        HttpStatus.BAD_REQUEST
+    );
+}
+
 }
 

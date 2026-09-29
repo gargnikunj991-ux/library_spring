@@ -13,22 +13,35 @@ This document describes the PostgreSQL database schema, JPA entity mapping, tabl
 │ PK  id                  │             │ PK  member_id           │             │ PK  id                  │
 │     title               │             │     name                │             │     username (unique)   │
 │     author              │             │     email               │             │     password            │
-│     available           │             │     phone_number        │             │     role                │
-└────────────┬────────────┘             └────────────┬────────────┘             └────────────┬────────────┘
-             │                                       │                                       │
-             │ 1                                     │ 1                                     │ 1
-             │                                       │                                       │
-             │ N                                     │ N                                     │ N
-┌────────────┴───────────────────────────────────────┴────────────┐             ┌────────────┴────────────┐
-│                         borrow_records                          │             │     refresh_tokens      │
-├─────────────────────────────────────────────────────────────────┤             ├─────────────────────────┤
-│ PK  borrow_id                                                   │             │ PK  id                  │
-│ FK  book_id    ──────────────► books(id)                        │             │ FK  user_id ──►users(id)│
-│ FK  member_id  ──────────────► members(member_id)               │             │     token (unique)      │
-│     borrow_date                                                 │             │     expiry_date         │
-│     due_date                                                    │             │     revoked             │
-│     return_date                                                 │             └─────────────────────────┘
-│     returned                                                    │
+│     total_copies        │             │     phone_number        │             │     role                │
+│     available_copies    │             └────────────┬────────────┘             └────────────┬────────────┘
+└───────┬─────────┬───────┘                          │                                       │
+        │         │                                  │                                       │
+        │ 1       │ 1                                │ 1                                     │ 1
+        │         │                                  │                                       │
+        │ N       │ N                                │ N                                     │ N
+        │         │         ┌────────────────────────┴────────────┐             ┌────────────┴────────────┐
+        │         │         │                         borrow_records      │             │     refresh_tokens      │
+        │         │         ├─────────────────────────────────────┤             ├─────────────────────────┤
+        │         │         │ PK  borrow_id                       │             │ PK  id                  │
+        │         └─────────┼►FK  book_id ──► books(id)           │             │ FK  user_id ──►users(id)│
+        │                   │ FK  member_id                       │             │     token (unique)      │
+        │                   │     borrow_date                     │             │     expiry_date         │
+        │                   │     due_date                        │             │     revoked             │
+        │                   │     return_date                     │             └─────────────────────────┘
+        │                   │     returned                        │
+        │                   └─────────────────────────────────────┘
+        │
+        │ N
+┌───────┴─────────────────────────────────────────────────────────┐
+│                        book_reservations                        │
+├─────────────────────────────────────────────────────────────────┤
+│ PK  id                                                          │
+│ FK  book_id    ──────────────► books(id)                        │
+│ FK  member_id  ──────────────► members(member_id)               │
+│     status     ──────────────► WAITING / NOTIFIED_READY / ...   │
+│     reserved_at                                                 │
+│     pickup_deadline                                             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -217,6 +230,50 @@ public class RefreshToken {
     private User user;
 
     private boolean revoked;
+}
+```
+
+---
+
+### 6. `book_reservations` Table
+
+Mapped to Entity: `com.nikunj.library.model.BookReservation`
+
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
+|---|---|---|---|---|
+| `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for the reservation |
+| `book_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "book_id", nullable = false)` | Foreign Key -> `books(id)` | References the reserved book |
+| `member_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "member_id", nullable = false)` | Foreign Key -> `members(member_id)` | References the reserving member |
+| `status` | `VARCHAR(255)` | `@Enumerated(EnumType.STRING) @Column(nullable = false)` | NOT NULL | `WAITING`, `NOTIFIED_READY`, `CLAIMED`, `EXPIRED`, `CANCELLED` |
+| `reserved_at` | `TIMESTAMP` | `@Column(name = "reserved_at", nullable = false)` | NOT NULL | Date & time when reservation was placed (FIFO priority) |
+| `pickup_deadline` | `TIMESTAMP` | `@Column(name = "pickup_deadline")` | Nullable | 48-hour deadline once asset is ready for pickup |
+
+**JPA Mapping (`BookReservation.java`)**:
+```java
+@Entity
+@Table(name = "book_reservations")
+public class BookReservation {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "book_id", nullable = false)
+    private Book book;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReservationStatus status = ReservationStatus.WAITING;
+
+    @Column(name = "reserved_at", nullable = false)
+    private LocalDateTime reservedAt = LocalDateTime.now();
+
+    @Column(name = "pickup_deadline")
+    private LocalDateTime pickupDeadline;
 }
 ```
 

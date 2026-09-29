@@ -2,26 +2,24 @@ package com.nikunj.library.service;
 
 
 import java.util.ArrayList;
-import java .util.List;
+import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.nikunj.library.dto.BookResponse;
-import com.nikunj.library.dto.CreateBookRequest;
 import com.nikunj.library.dto.CreateMemberRequest;
 import com.nikunj.library.dto.MemberResponse;
-import com.nikunj.library.exception.BookNotFoundException;
 import com.nikunj.library.exception.MemberNotFoundException;
-import com.nikunj.library.model.Book;
-import  com.nikunj.library.model.Member;
-import  com.nikunj.library.repository.MemberRepository;
+import com.nikunj.library.model.Member;
+import com.nikunj.library.repository.MemberRepository;
 
 @Service
 public class MemberService {
     
-    @Autowired
-    private MemberRepository memberRepository;
+    private final MemberRepository memberRepository;
+
+    public MemberService(MemberRepository memberRepository) {
+        this.memberRepository = memberRepository;
+    }
     
     public MemberResponse addMember(CreateMemberRequest request){
         Member member = new Member();

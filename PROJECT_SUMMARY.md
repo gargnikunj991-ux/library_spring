@@ -45,7 +45,7 @@ Centralized Exception Handling is managed across all controllers using `@Control
 - **Data Persistence**: Spring Data JPA (`spring-boot-starter-data-jpa`), Hibernate
 - **Database**: PostgreSQL (Driver: `org.postgresql.Driver`), H2 In-Memory (Test scope)
 - **Validation**: Jakarta Validation (`spring-boot-starter-validation`)
-- **Testing**: JUnit 5, Mockito (33 automated Unit & Concurrency Integration Tests)
+- **Testing**: JUnit 5, Mockito (48 automated Unit, Concurrency, and Waitlist Integration Tests)
 - **Build Tool**: Maven
 
 ---
@@ -65,26 +65,31 @@ com.nikunj.library
 │   ├── AuthController.java           # REST Endpoints for /auth (login & register integration)
 │   ├── BookController.java           # REST Endpoints for /api/books
 │   ├── MemberController.java         # REST Endpoints for /api/members
-│   └── Borrowcontroller.java         # REST Endpoints for /api/borrow (POST /api/borrow & POST /api/borrow/return/{borrowId})
+│   ├── Borrowcontroller.java         # REST Endpoints for /api/borrow (POST /api/borrow & POST /api/borrow/return/{borrowId})
+│   └── ReservationController.java    # REST Endpoints for /api/reservations (join waitlist, cancel, queue queries)
 ├── service/                          # Business Logic & Service Layer
 │   ├── AuthService.java              # User registration logic with PasswordEncoder & login support
 │   ├── BookService.java              # Book CRUD logic & DTO mapping
-│   ├── BorrowService.java            # Book borrowing & return transaction logic
+│   ├── BorrowService.java            # Book borrowing & return transaction logic (with auto-reservation allocation)
 │   ├── CustomUserDetailsService.java# Spring Security UserDetailsService implementation
 │   ├── JwtService.java               # JWT token generation and validation service
 │   ├── MemberService.java            # Member CRUD logic & DTO mapping
-│   └── RefreshTokenService.java      # Refresh token creation, expiry verification, and rotation logic
+│   ├── RefreshTokenService.java      # Refresh token creation, expiry verification, and rotation logic
+│   └── ReservationService.java       # FIFO waitlist queueing, 48h pickup deadline, and reallocation logic
 ├── repository/                       # Data Access Layer (Spring Data JPA)
 │   ├── BookRepository.java           # JpaRepository<Book, Long> with pessimistic write lock (findByIdForUpdate)
+│   ├── BookReservationRepository.java# JpaRepository<BookReservation, Long> with FIFO query methods
 │   ├── BorrowRecordRepository.java   # JpaRepository<BorrowRecord, Long>
 │   ├── MemberRepository.java         # JpaRepository<Member, Long>
 │   ├── RefreshTokenRepository.java   # JpaRepository<RefreshToken, Long>
 │   └── UserRepository.java           # JpaRepository<User, Long>
 ├── model/                            # JPA Database Entities
 │   ├── Book.java                     # "books" table entity (totalCopies, availableCopies)
+│   ├── BookReservation.java          # "book_reservations" table entity (FIFO waitlist queue, pickupDeadline)
 │   ├── Member.java                   # "members" table entity
 │   ├── BorrowRecord.java             # "borrow_records" table entity with Foreign Keys
 │   ├── RefreshToken.java             # "refresh_tokens" table entity for JWT refresh token rotation (@ManyToOne User relation)
+│   ├── ReservationStatus.java        # Enum (WAITING, NOTIFIED_READY, CLAIMED, EXPIRED, CANCELLED)
 │   └── User.java                     # "users" table entity for authentication (Role: ADMIN, LIBRARIAN, ASSISTANT)
 ├── dto/                              # Data Transfer Objects (API Contracts)
 │   ├── BookResponse.java             # Outbound DTO for Book responses (totalCopies, availableCopies, available)
@@ -92,16 +97,20 @@ com.nikunj.library
 │   ├── CreateBookRequest.java        # Inbound DTO for creating/updating Books (totalCopies validation)
 │   ├── CreateBorrowRequest.java      # Inbound DTO for borrowing a book
 │   ├── CreateMemberRequest.java      # Inbound DTO for creating/updating Members
+│   ├── CreateReservationRequest.java # Inbound DTO for placing a reservation
 │   ├── LoginRequest.java             # Inbound DTO for authentication
 │   ├── LoginResponse.java            # Outbound DTO containing accessToken, refreshToken, tokenType
 │   ├── MemberResponse.java           # Outbound DTO for Member responses
 │   ├── RefreshTokenRequest.java      # Inbound DTO for token renewal (/auth/refresh)
-│   └── RegisterRequest.java          # Inbound DTO for user registration
+│   ├── RegisterRequest.java          # Inbound DTO for user registration
+│   └── ReservationResponse.java      # Outbound DTO for reservation status & pickup deadlines
 └── exception/                        # Custom Exceptions & Global Handler
     ├── BookNotFoundException.java    # Thrown when Book ID is not found (HTTP 404)
-    ├── MemberNotFoundException.java  # Thrown when Member ID is not found (HTTP 404)
-    ├── BookUnavailableException.java# Thrown when Book is already borrowed (HTTP 404)
+    ├── BookUnavailableException.java # Thrown when Book is already borrowed (HTTP 404)
     ├── BorrowRecordNotFoundException.java # Thrown when Borrow Record ID is not found (HTTP 404)
+    ├── DuplicateReservationException.java# Thrown when Member already has active reservation (HTTP 409)
+    ├── MemberNotFoundException.java  # Thrown when Member ID is not found (HTTP 404)
+    ├── ReservationNotFoundException.java # Thrown when Reservation ID is not found (HTTP 404)
     ├── TokenRefreshException.java    # Thrown when Refresh Token is expired or invalid (HTTP 401)
     └── GlobalExceptionHandler.java   # Centralized @ControllerAdvice handling all exceptions
 ```
@@ -115,16 +124,26 @@ com.nikunj.library
    - When a book is added, `availableCopies` defaults to `totalCopies` (at least 1).
    - When a book is borrowed via `POST /api/borrow`, `Borrowcontroller` delegates to `BorrowService.borrowBook()`.
    - The transaction acquires a **Pessimistic Write Lock (`SELECT ... FOR UPDATE`)** via `BookRepository.findByIdForUpdate(bookId)` to eliminate TOCTOU race conditions.
-   - The system verifies `book.getAvailableCopies() > 0`. If copies are exhausted, `BookUnavailableException` is thrown.
+   - If a member has an active `NOTIFIED_READY` reservation within its 48-hour pickup window, the reservation is transitioned to `CLAIMED` and loan created without double-decrementing inventory.
+   - Otherwise, the system verifies `book.getAvailableCopies() > 0`. If copies are exhausted, `BookUnavailableException` is thrown.
    - Upon successful borrow, `availableCopies` is decremented atomically by 1, and a `BorrowRecord` is created with `borrowDate` (today) and `dueDate` (today + 14 days).
 
-2. **Book Return (`POST /api/borrow/return/{borrowId}`)**:
+2. **Book Return & FIFO Waitlist Auto-Assignment (`POST /api/borrow/return/{borrowId}`)**:
    - When a book is returned via `POST /api/borrow/return/{borrowId}`, `BorrowService.returnBook()` finds the record.
    - If missing, `BorrowRecordNotFoundException` is thrown.
    - Sets `returned = true` and `returnDate = LocalDate.now()`.
-   - Locks the associated `Book` entity and safely increments `availableCopies` by 1 (capped at `totalCopies`).
+   - Locks the associated `Book` entity with `findByIdForUpdate`.
+   - Checks if there is a `WAITING` reservation in the FIFO queue via `BookReservationRepository.findFirstByBookIdAndStatusOrderByReservedAtAsc`.
+   - **If a reservation is found**: Sets its status to `NOTIFIED_READY` and `pickupDeadline = LocalDateTime.now().plusHours(48)`. Public `availableCopies` is **not** incremented, holding the physical copy exclusively for that member!
+   - **If no reservation is waiting**: Safely increments `availableCopies` by 1 (capped at `totalCopies`).
 
-3. **Security, User Registration & Refresh Token Rotation**:
+3. **FIFO Waitlist Queue Engine (`/api/reservations`)**:
+   - Members can queue for out-of-stock books via `POST /api/reservations`.
+   - Enforces `book.availableCopies == 0` (patrons must borrow directly if copies exist).
+   - Rejects duplicate active reservations for the same member & book (`409 Conflict`).
+   - If a patron cancels a `NOTIFIED_READY` reservation, the held copy is automatically reallocated to the next waiting patron, or restored to general inventory if the queue is exhausted.
+
+4. **Security, User Registration & Refresh Token Rotation**:
    - `SecurityConfig` configures `SecurityFilterChain` to disable CSRF, enforce stateless session management (`SessionCreationPolicy.STATELESS`), and configure explicit exception handling:
      - `AuthenticationEntryPoint`: Returns `401 Unauthorized` for missing/invalid JWT tokens.
      - `AccessDeniedHandler`: Returns `403 Forbidden` for insufficient roles/permissions.
@@ -135,15 +154,16 @@ com.nikunj.library
    - `RefreshTokenService` validates expiration and issues new access tokens on `POST /auth/refresh`. If token expired or revoked, `TokenRefreshException` is thrown.
    - `POST /auth/logout` requires authentication and a valid role (`ADMIN`, `LIBRARIAN`, `ASSISTANT`), delegating to `RefreshTokenService.revokeByUsername()` to set `revoked = true` in PostgreSQL.
 
-4. **DTO Isolation**:
-   - Entities (`Book`, `Member`, `BorrowRecord`, `User`) are **never** exposed directly to API callers.
+5. **DTO Isolation**:
+   - Entities (`Book`, `BookReservation`, `Member`, `BorrowRecord`, `User`) are **never** exposed directly to API callers.
    - Controllers accept `@Valid` Request DTOs and return Response DTOs inside `ResponseEntity`.
    - Services perform mapping between Entities and DTOs.
 
-5. **Validation Rules**:
-   - `CreateBookRequest`: `title` (not blank), `author` (not blank).
+6. **Validation Rules**:
+   - `CreateBookRequest`: `title` (not blank), `author` (not blank), `totalCopies` (min 1).
    - `CreateMemberRequest`: `name` (not blank), `email` (not blank, valid email format), `phoneNumber` (not blank).
    - `CreateBorrowRequest`: `bookId` (not null), `memberId` (not null).
+   - `CreateReservationRequest`: `bookId` (not null), `memberId` (not null).
 
 ---
 
@@ -163,7 +183,7 @@ com.nikunj.library
 ## 📜 Development & Coding Guidelines (`AGENTS.md`)
 
 - **Layer Boundaries**: Never bypass the Service layer. Controllers only handle HTTP; Services handle business logic; Repositories handle persistence.
-- **Dependency Injection**: Use `@Autowired` or Constructor Injection.
+- **Dependency Injection**: Use Constructor Injection exclusively across all controllers, services, and components (zero `@Autowired` field injection).
 - **Exception Handling**: Always throw specific runtime exceptions (`BookNotFoundException`, `MemberNotFoundException`, `BookUnavailableException`) instead of returning null or generic errors.
 - **Before Editing Code Rule**: Read relevant files → Explain problem → Suggest solution → Wait for approval before modifying files.
 - **Documentation Maintenance Rule**: Read project `.md` files when changes are requested, and update them at the end of each session.

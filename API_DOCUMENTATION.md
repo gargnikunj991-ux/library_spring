@@ -349,14 +349,17 @@ Base Path: `/api/borrow`
 ### 🔹 3.2 Return a Book
 - **HTTP Method**: `POST`
 - **Path**: `/api/borrow/return/{borrowId}`
-- **Description**: Marks a borrowed book as returned and sets the book availability back to `true`.
+- **Description**: Marks a borrowed book as returned. If active waitlist reservations exist for this book, the returned copy is automatically locked for the next patron in the FIFO queue with a 48-hour pickup window (`NOTIFIED_READY`); otherwise, the book's `availableCopies` is safely incremented.
 - **Path Variable**: `borrowId` (Long) - ID of the borrow record
 - **Business Behavior**:
   1. Finds `BorrowRecord` by `borrowId` (throws `BorrowRecordNotFoundException` if missing).
   2. If not already returned:
      - Sets `returned` = `true`.
      - Sets `returnDate` = today (`LocalDate.now()`).
-     - Resets associated `book.setAvailable(true)` and saves `Book`.
+     - Acquires pessimistic lock on `Book`.
+     - Checks for `WAITING` reservations:
+       - **If reservation found**: sets reservation status to `NOTIFIED_READY` and `pickupDeadline` to `now() + 48 hours`. Does not increment public `availableCopies`.
+       - **If no reservation found**: increments `availableCopies` (capped at `totalCopies`).
      - Saves `BorrowRecord`.
   3. Returns updated `BorrowResponse`.
 - **Response**:
@@ -377,7 +380,89 @@ Base Path: `/api/borrow`
 
 ---
 
-## ⚠️ 4. Global Error Handling & HTTP Status Codes
+## 🎟️ 4. Reservation & Waitlist API Endpoints (`/api/reservations`)
+
+Base Path: `/api/reservations`
+
+### 🔹 4.1 Join Waitlist (Create Reservation)
+- **HTTP Method**: `POST`
+- **Path**: `/api/reservations`
+- **Description**: Places a member in the FIFO waitlist queue for an out-of-stock book.
+- **Request Body**: `CreateReservationRequest` (JSON)
+```json
+{
+  "bookId": 1,
+  "memberId": 2
+}
+```
+- **Validation Rules**:
+  - `bookId`: `@NotNull(message = "Book ID is mandatory")`
+  - `memberId`: `@NotNull(message = "Member ID is mandatory")`
+- **Business Rules**:
+  - Requires `book.availableCopies == 0` (returns `400 Bad Request` if copies are available).
+  - Rejects duplicate active reservations for the same member (`409 Conflict`).
+- **Response**: `201 Created`
+```json
+{
+  "reservationId": 1,
+  "bookId": 1,
+  "bookTitle": "Clean Code",
+  "memberId": 2,
+  "memberName": "Alice Smith",
+  "status": "WAITING",
+  "reservedAt": "2026-09-29T17:45:00",
+  "pickupDeadline": null
+}
+```
+
+---
+
+### 🔹 4.2 Cancel Reservation
+- **HTTP Method**: `POST`
+- **Path**: `/api/reservations/{id}/cancel`
+- **Description**: Cancels an active reservation. If the reservation was in `NOTIFIED_READY` status, the held copy is automatically reallocated to the next waiting patron, or returned to public inventory if the queue is empty.
+- **Path Variable**: `id` (Long) - Reservation ID
+- **Response**: `200 OK`
+```json
+{
+  "reservationId": 1,
+  "bookId": 1,
+  "bookTitle": "Clean Code",
+  "memberId": 2,
+  "memberName": "Alice Smith",
+  "status": "CANCELLED",
+  "reservedAt": "2026-09-29T17:45:00",
+  "pickupDeadline": null
+}
+```
+
+---
+
+### 🔹 4.3 Get Reservation by ID
+- **HTTP Method**: `GET`
+- **Path**: `/api/reservations/{id}`
+- **Description**: Retrieves details of a specific reservation.
+- **Response**: `200 OK` (or `404 Not Found`)
+
+---
+
+### 🔹 4.4 Get Waitlist Queue for a Book
+- **HTTP Method**: `GET`
+- **Path**: `/api/reservations/book/{bookId}`
+- **Description**: Retrieves all `WAITING` reservations for a book ordered by FIFO priority (`reservedAt ASC`).
+- **Response**: `200 OK` (list of `ReservationResponse`)
+
+---
+
+### 🔹 4.5 Get Member Reservations
+- **HTTP Method**: `GET`
+- **Path**: `/api/reservations/member/{memberId}`
+- **Description**: Retrieves all reservations associated with a member ordered chronologically.
+- **Response**: `200 OK` (list of `ReservationResponse`)
+
+---
+
+## ⚠️ 5. Global Error Handling & HTTP Status Codes
 
 ### Application Exceptions (Centralized in `GlobalExceptionHandler.java`):
 
@@ -387,6 +472,9 @@ Base Path: `/api/borrow`
 | `MemberNotFoundException` | `404 NOT_FOUND` | `"Member Not Found"` |
 | `BookUnavailableException` | `404 NOT_FOUND` | `"Book Not available"` |
 | `BorrowRecordNotFoundException` | `404 NOT_FOUND` | `"Borrow Record Not Found"` |
+| `ReservationNotFoundException` | `404 NOT_FOUND` | `"Reservation Not Found"` |
+| `DuplicateReservationException` | `409 CONFLICT` | `"Member already has an active reservation for this book"` |
+| `IllegalStateException` | `400 BAD_REQUEST` | Message string |
 | `TokenRefreshException` | `401 UNAUTHORIZED` | `"Failed for [token]: message"` |
 | `MethodArgumentNotValidException` | `400 BAD_REQUEST` | `["Error message 1", "Error message 2"]` |
 
@@ -396,4 +484,5 @@ Base Path: `/api/borrow`
 |---|---|---|
 | Missing, invalid, or expired JWT token (`AuthenticationEntryPoint`) | `401 UNAUTHORIZED` | `{"error": "Unauthorized", "message": "Full authentication is required to access this resource"}` |
 | Insufficient role / permission (`AccessDeniedHandler`) | `403 FORBIDDEN` | `{"error": "Forbidden", "message": "You do not have permission to access this resource"}` |
+
 

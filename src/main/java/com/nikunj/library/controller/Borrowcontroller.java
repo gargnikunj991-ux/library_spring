@@ -18,8 +18,11 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/borrow")
 public class Borrowcontroller {
 
-    @Autowired
-    private BorrowService borrowService;
+    private final BorrowService borrowService;
+
+    public Borrowcontroller(BorrowService borrowService) {
+        this.borrowService = borrowService;
+    }
 
     @PostMapping
     public ResponseEntity<BorrowResponse> borrowBook(@Valid @RequestBody CreateBorrowRequest request) {

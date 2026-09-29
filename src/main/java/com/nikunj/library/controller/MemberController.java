@@ -2,7 +2,6 @@ package com.nikunj.library.controller;
 
 import java.util.List;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -14,7 +13,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.nikunj.library.dto.CreateMemberRequest;
 import com.nikunj.library.dto.MemberResponse;
-import com.nikunj.library.repository.MemberRepository;
 import com.nikunj.library.service.MemberService;
 
 import jakarta.validation.Valid;
@@ -24,12 +22,10 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/members")
 public class MemberController {
 
-    private final MemberRepository memberRepository;
-    @Autowired
-    private MemberService memberService;
+    private final MemberService memberService;
 
-    MemberController(MemberRepository memberRepository) {
-        this.memberRepository = memberRepository;
+    public MemberController(MemberService memberService) {
+        this.memberService = memberService;
     }
 
     @PostMapping  

@@ -7,6 +7,14 @@ public class CreateBorrowRequest {
     @NotNull(message="MemberId is mandatory")
     private Long memberId;
 
+    public CreateBorrowRequest() {
+    }
+
+    public CreateBorrowRequest(Long bookId, Long memberId) {
+        this.bookId = bookId;
+        this.memberId = memberId;
+    }
+
     public Long getMemberId(){
         return memberId;
     }

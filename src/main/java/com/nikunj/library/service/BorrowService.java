@@ -1,8 +1,9 @@
 package com.nikunj.library.service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.Optional;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,9 +14,12 @@ import com.nikunj.library.exception.BookUnavailableException;
 import com.nikunj.library.exception.BorrowRecordNotFoundException;
 import com.nikunj.library.exception.MemberNotFoundException;
 import com.nikunj.library.model.Book;
+import com.nikunj.library.model.BookReservation;
 import com.nikunj.library.model.BorrowRecord;
 import com.nikunj.library.model.Member;
+import com.nikunj.library.model.ReservationStatus;
 import com.nikunj.library.repository.BookRepository;
+import com.nikunj.library.repository.BookReservationRepository;
 import com.nikunj.library.repository.BorrowRecordRepository;
 import com.nikunj.library.repository.MemberRepository;
 
@@ -25,13 +29,16 @@ public class BorrowService {
     private final BookRepository bookRepository;
     private final MemberRepository memberRepository;
     private final BorrowRecordRepository borrowRecordRepository;
+    private final BookReservationRepository bookReservationRepository;
 
     public BorrowService(BookRepository bookRepository,
                          MemberRepository memberRepository,
-                         BorrowRecordRepository borrowRecordRepository) {
+                         BorrowRecordRepository borrowRecordRepository,
+                         BookReservationRepository bookReservationRepository) {
         this.bookRepository = bookRepository;
         this.memberRepository = memberRepository;
         this.borrowRecordRepository = borrowRecordRepository;
+        this.bookReservationRepository = bookReservationRepository;
     }
 
     @Transactional
@@ -47,14 +54,33 @@ public class BorrowService {
         Book book = bookRepository.findByIdForUpdate(bookId)
                 .orElseThrow(() -> new BookNotFoundException("Book not found"));
 
-        // Check availability
-        if (book.getAvailableCopies() <= 0) {
-            throw new BookUnavailableException("Book is currently unavailable");
+        // Check if member has an active NOTIFIED_READY reservation for this book
+        Optional<BookReservation> readyReservation = bookReservationRepository
+                .findFirstByBookIdAndMemberMemberIdAndStatus(book.getId(), member.getMemberId(), ReservationStatus.NOTIFIED_READY);
+
+        boolean claimingReservation = false;
+        if (readyReservation.isPresent()) {
+            BookReservation reservation = readyReservation.get();
+            if (reservation.getPickupDeadline() != null && reservation.getPickupDeadline().isBefore(LocalDateTime.now())) {
+                reservation.setStatus(ReservationStatus.EXPIRED);
+                bookReservationRepository.save(reservation);
+            } else {
+                reservation.setStatus(ReservationStatus.CLAIMED);
+                bookReservationRepository.save(reservation);
+                claimingReservation = true;
+            }
         }
 
-        // Atomically decrement available copies
-        book.setAvailableCopies(book.getAvailableCopies() - 1);
-        bookRepository.save(book);
+        if (!claimingReservation) {
+            // Check availability
+            if (book.getAvailableCopies() <= 0) {
+                throw new BookUnavailableException("Book is currently unavailable");
+            }
+
+            // Atomically decrement available copies
+            book.setAvailableCopies(book.getAvailableCopies() - 1);
+            bookRepository.save(book);
+        }
 
         // Create BorrowRecord
         BorrowRecord borrowRecord = new BorrowRecord();
@@ -97,8 +123,21 @@ public class BorrowService {
             Book book = borrowRecord.getBook();
             if (book != null) {
                 Book lockedBook = bookRepository.findByIdForUpdate(book.getId()).orElse(book);
-                lockedBook.setAvailableCopies(Math.min(lockedBook.getTotalCopies(), lockedBook.getAvailableCopies() + 1));
-                bookRepository.save(lockedBook);
+
+                // Check FIFO waitlist queue for next waiting reservation
+                Optional<BookReservation> nextInLine = bookReservationRepository
+                        .findFirstByBookIdAndStatusOrderByReservedAtAsc(lockedBook.getId(), ReservationStatus.WAITING);
+
+                if (nextInLine.isPresent()) {
+                    BookReservation reservation = nextInLine.get();
+                    reservation.setStatus(ReservationStatus.NOTIFIED_READY);
+                    reservation.setPickupDeadline(LocalDateTime.now().plusHours(48));
+                    bookReservationRepository.save(reservation);
+                    // Do not increment availableCopies; copy is held for the reserved patron
+                } else {
+                    lockedBook.setAvailableCopies(Math.min(lockedBook.getTotalCopies(), lockedBook.getAvailableCopies() + 1));
+                    bookRepository.save(lockedBook);
+                }
             }
 
             borrowRecordRepository.save(borrowRecord);

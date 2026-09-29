@@ -8,8 +8,11 @@ import com.nikunj.library.exception.BorrowRecordNotFoundException;
 import com.nikunj.library.exception.MemberNotFoundException;
 import com.nikunj.library.model.Book;
 import com.nikunj.library.model.BorrowRecord;
+import com.nikunj.library.model.BookReservation;
 import com.nikunj.library.model.Member;
+import com.nikunj.library.model.ReservationStatus;
 import com.nikunj.library.repository.BookRepository;
+import com.nikunj.library.repository.BookReservationRepository;
 import com.nikunj.library.repository.BorrowRecordRepository;
 import com.nikunj.library.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -38,6 +42,9 @@ public class BorrowServiceTest {
 
     @Mock
     private BorrowRecordRepository borrowRecordRepository;
+
+    @Mock
+    private BookReservationRepository bookReservationRepository;
 
     @InjectMocks
     private BorrowService borrowService;
@@ -212,5 +219,78 @@ public class BorrowServiceTest {
         assertNotNull(response);
         assertEquals(3, sampleBook.getAvailableCopies());
         verify(bookRepository, times(1)).save(sampleBook);
+    }
+
+    @Test
+    @DisplayName("Return Book: When waiting reservation exists, locks book for reservation and leaves availableCopies untouched")
+    void testReturnBook_AutoAssignsToWaitingReservation() {
+        sampleBook.setAvailableCopies(0);
+
+        BorrowRecord record = new BorrowRecord();
+        record.setBorrowId(103L);
+        record.setMember(sampleMember);
+        record.setBook(sampleBook);
+        record.setReturned(false);
+
+        Member waitingMember = new Member();
+        waitingMember.setMemberId(2L);
+        waitingMember.setName("Bob Smith");
+
+        BookReservation waitingReservation = new BookReservation();
+        waitingReservation.setId(50L);
+        waitingReservation.setBook(sampleBook);
+        waitingReservation.setMember(waitingMember);
+        waitingReservation.setStatus(ReservationStatus.WAITING);
+
+        when(borrowRecordRepository.findById(103L)).thenReturn(Optional.of(record));
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(sampleBook));
+        when(bookReservationRepository.findFirstByBookIdAndStatusOrderByReservedAtAsc(10L, ReservationStatus.WAITING))
+                .thenReturn(Optional.of(waitingReservation));
+
+        BorrowResponse response = borrowService.returnBook(103L);
+
+        assertNotNull(response);
+        assertTrue(response.isReturned());
+        assertEquals(0, sampleBook.getAvailableCopies()); // Still 0, held for Bob!
+        assertEquals(ReservationStatus.NOTIFIED_READY, waitingReservation.getStatus());
+        assertNotNull(waitingReservation.getPickupDeadline());
+
+        verify(bookReservationRepository, times(1)).save(waitingReservation);
+        verify(bookRepository, never()).save(sampleBook);
+    }
+
+    @Test
+    @DisplayName("Borrow Book: Member with NOTIFIED_READY reservation claims copy even when availableCopies is 0")
+    void testBorrowBook_ClaimReadyReservation() {
+        sampleBook.setAvailableCopies(0);
+
+        BookReservation readyReservation = new BookReservation();
+        readyReservation.setId(51L);
+        readyReservation.setBook(sampleBook);
+        readyReservation.setMember(sampleMember);
+        readyReservation.setStatus(ReservationStatus.NOTIFIED_READY);
+        readyReservation.setPickupDeadline(LocalDateTime.now().plusHours(24));
+
+        when(memberRepository.findById(1L)).thenReturn(Optional.of(sampleMember));
+        when(bookRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(sampleBook));
+        when(bookReservationRepository.findFirstByBookIdAndMemberMemberIdAndStatus(10L, 1L, ReservationStatus.NOTIFIED_READY))
+                .thenReturn(Optional.of(readyReservation));
+
+        BorrowRecord savedRecord = new BorrowRecord();
+        savedRecord.setBorrowId(104L);
+        savedRecord.setMember(sampleMember);
+        savedRecord.setBook(sampleBook);
+        savedRecord.setBorrowDate(LocalDate.now());
+        savedRecord.setDueDate(LocalDate.now().plusDays(14));
+        savedRecord.setReturned(false);
+
+        when(borrowRecordRepository.save(any(BorrowRecord.class))).thenReturn(savedRecord);
+
+        BorrowResponse response = borrowService.borrowBook(borrowRequest);
+
+        assertNotNull(response);
+        assertEquals(ReservationStatus.CLAIMED, readyReservation.getStatus());
+        verify(bookReservationRepository, times(1)).save(readyReservation);
+        verify(borrowRecordRepository, times(1)).save(any(BorrowRecord.class));
     }
 }
