@@ -155,6 +155,10 @@ The goal is to master Spring Boot concepts ground-up:
   - Integrated `BorrowService.returnBook(...)` to automatically lock returned copies for next-in-line patrons with a 48-hour pickup window (`NOTIFIED_READY`) instead of leaking to public availability.
   - Added 12 unit tests in `ReservationServiceTest` and end-to-end integration test in `BorrowReservationIntegrationTest`.
   - Full test suite: 48/48 tests passing (100%).
+* [x] **Portfolio & ATS Resume Synchronization**
+  - Updated [`resume.html`](file:///D:/newjava/real/resume.html) and compiled [`resume.pdf`](file:///D:/newjava/real/resume.pdf) with high-concurrency bullet points (TOCTOU elimination, pessimistic row locking, 48-hour FIFO waitlist queue, 48 automated tests).
+  - Updated [`index.html`](file:///D:/newjava/real/index.html) project card, modal specs, and terminal CLI.
+  - Pushed to `origin/master` (Commit `922c426`).
 
 ---
 
@@ -163,10 +167,11 @@ The goal is to master Spring Boot concepts ground-up:
 | Commit | Conventional Commit Message | Implementation Scope | Time Est. |
 | :---: | :--- | :--- | :---: |
 | **Commit 1 & 2** | `feat(reservation): implement FIFO waitlist queue, auto-assignment on return, and test suite` | ✅ Completed (48 tests passing) | DONE |
+| **Portfolio Sync** | `feat(portfolio): rebrand library project to LibroSphere with concurrency & FIFO waitlist metrics` | ✅ Completed (resume & portfolio pushed) | DONE |
 | **Commit 3** | `feat(worker): implement nightly overdue fine reconciliation with @Scheduled cron` | • `FineRecord` entity (tracks accrued overdue fines & payment status)<br>• `FineRecordRepository`<br>• `@EnableScheduling` & `OverdueReconciliationWorker` running nightly at midnight (`0 0 0 * * *`) calculating ₹10/day penalty idempotently | ~25 min |
 | **Commit 4** | `perf(db): add composite B-Tree indexes on book catalog and worker test suite` | • Automated unit/integration tests for overdue reconciliation worker<br>• Add PostgreSQL composite B-Tree indexes on `books(title, author)` for sub-millisecond lookups | ~15 min |
 | **Commit 5** | `ci(devops): add multi-stage Dockerfile, docker-compose, and GitHub Actions workflow` | • Multi-stage `Dockerfile` (Eclipse Temurin JRE 21 lean container)<br>• `docker-compose.yml` (LibroSphere backend + PostgreSQL 16)<br>• `.github/workflows/ci.yml` (Automated build & test on every push) | ~20 min |
-| **Commit 6** | `docs(portfolio): finalize LibroSphere architecture docs and live Railway deployment` | • Deploy backend live to Railway (live Swagger UI)<br>• Synchronize all project markdown files (`README.md`, `API_DOCUMENTATION.md`)<br>• Update resume PDF (`newjava/real/resume.pdf`) and portfolio site (`index.html`) with senior-level bullet points | ~25 min |
+| **Commit 6** | `docs(portfolio): finalize LibroSphere architecture docs and live Railway deployment` | • Deploy backend live to Railway (live Swagger UI)<br>• Synchronize all project markdown files (`README.md`, `API_DOCUMENTATION.md`) | ~20 min |
 
 ---
 
