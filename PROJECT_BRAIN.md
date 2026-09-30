@@ -173,9 +173,9 @@ The goal is to master Spring Boot concepts ground-up:
   - Added optimized catalog search endpoint: `GET /api/books/search?query=...` with case-insensitive `LIKE` matching in `BookRepository`, `BookService`, and `BookController`.
   - Added automated unit tests in `BookServiceTest`. Full test suite: 64/64 tests passing (100%).
 * [x] **Portfolio & ATS Resume Synchronization**
-  - Updated [`resume.html`](file:///D:/newjava/real/resume.html) and compiled [`resume.pdf`](file:///D:/newjava/real/resume.pdf) with high-concurrency bullet points (TOCTOU elimination, pessimistic row locking, 48-hour FIFO waitlist queue, automated tests).
-  - Updated [`index.html`](file:///D:/newjava/real/index.html) project card, modal specs, and terminal CLI.
-  - Pushed to `origin/master` (Commit `922c426`).
+  - Updated [`resume.html`](file:///D:/newjava/real/resume.html) and compiled [`resume.pdf`](file:///D:/newjava/real/resume.pdf) with calibrated, natural engineering bullet points (pessimistic row locking, 48-hour FIFO waitlist queue, scheduled fine reconciliation, composite B-Tree indexes, and 64 automated tests).
+  - Updated [`index.html`](file:///D:/newjava/real/index.html) project card and terminal CLI.
+  - Pushed to `origin/master` (Commit `3ee055c`).
 
 ---
 
