@@ -9,12 +9,17 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "book_reservations")
+@Table(name = "book_reservations", indexes = {
+    @Index(name = "idx_reservation_book_status_fifo", columnList = "book_id, status, reserved_at"),
+    @Index(name = "idx_reservation_member_status", columnList = "member_id, status"),
+    @Index(name = "idx_reservation_status_deadline", columnList = "status, pickup_deadline")
+})
 public class BookReservation {
 
     @Id

@@ -167,4 +167,33 @@ public class BookServiceTest {
         assertEquals(7, resp.getTotalCopies());
         assertEquals(4, resp.getAvailableCopies()); // 2 + (7 - 5) = 4
     }
+
+    @Test
+    @DisplayName("Search Books: Returns matching books when query provided")
+    void testSearchBooks_WithQuery() {
+        when(bookRepository.searchBooks("patterns")).thenReturn(List.of(sampleBook));
+
+        List<BookResponse> results = bookService.searchBooks("patterns");
+
+        assertNotNull(results);
+        assertEquals(1, results.size());
+        assertEquals("Design Patterns", results.get(0).getTitle());
+        verify(bookRepository, times(1)).searchBooks("patterns");
+    }
+
+    @Test
+    @DisplayName("Search Books: Defaults to all books when query is null or blank")
+    void testSearchBooks_NullOrBlankQuery() {
+        when(bookRepository.findAll()).thenReturn(List.of(sampleBook));
+
+        List<BookResponse> resultsNull = bookService.searchBooks(null);
+        List<BookResponse> resultsBlank = bookService.searchBooks("   ");
+
+        assertNotNull(resultsNull);
+        assertEquals(1, resultsNull.size());
+        assertNotNull(resultsBlank);
+        assertEquals(1, resultsBlank.size());
+        verify(bookRepository, times(2)).findAll();
+        verify(bookRepository, never()).searchBooks(anyString());
+    }
 }

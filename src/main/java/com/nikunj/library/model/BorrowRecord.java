@@ -2,16 +2,22 @@ package com.nikunj.library.model;
 
 import java.time.LocalDate;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "borrow_records")
+@Table(name = "borrow_records", indexes = {
+    @Index(name = "idx_borrow_returned_due_date", columnList = "returned, due_date"),
+    @Index(name = "idx_borrow_member_id", columnList = "member_id"),
+    @Index(name = "idx_borrow_book_id", columnList = "book_id")
+})
 public class BorrowRecord {
 
     @Id
@@ -26,9 +32,16 @@ public class BorrowRecord {
     @JoinColumn(name = "member_id")
     private Member member;
 
+    @Column(name = "borrow_date")
     private LocalDate borrowDate;
+
+    @Column(name = "due_date")
     private LocalDate dueDate;
+
+    @Column(name = "return_date")
     private LocalDate returnDate;
+
+    @Column(nullable = false)
     private boolean returned;
 
     public Long getBorrowId() {

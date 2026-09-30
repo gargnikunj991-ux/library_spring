@@ -80,7 +80,10 @@ Mapped to Entity: `com.nikunj.library.model.Book`
 **JPA Mapping (`Book.java`)**:
 ```java
 @Entity
-@Table(name = "books")
+@Table(name = "books", indexes = {
+    @Index(name = "idx_books_title_author", columnList = "title, author"),
+    @Index(name = "idx_books_author", columnList = "author")
+})
 public class Book {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -146,7 +149,11 @@ Mapped to Entity: `com.nikunj.library.model.BorrowRecord`
 **JPA Mapping (`BorrowRecord.java`)**:
 ```java
 @Entity
-@Table(name = "borrow_records")
+@Table(name = "borrow_records", indexes = {
+    @Index(name = "idx_borrow_returned_due_date", columnList = "returned, due_date"),
+    @Index(name = "idx_borrow_member_id", columnList = "member_id"),
+    @Index(name = "idx_borrow_book_id", columnList = "book_id")
+})
 public class BorrowRecord {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -160,9 +167,16 @@ public class BorrowRecord {
     @JoinColumn(name = "member_id")
     private Member member;
 
+    @Column(name = "borrow_date")
     private LocalDate borrowDate;
+
+    @Column(name = "due_date")
     private LocalDate dueDate;
+
+    @Column(name = "return_date")
     private LocalDate returnDate;
+
+    @Column(nullable = false)
     private boolean returned;
 }
 ```
@@ -267,7 +281,11 @@ Mapped to Entity: `com.nikunj.library.model.BookReservation`
 **JPA Mapping (`BookReservation.java`)**:
 ```java
 @Entity
-@Table(name = "book_reservations")
+@Table(name = "book_reservations", indexes = {
+    @Index(name = "idx_reservation_book_status_fifo", columnList = "book_id, status, reserved_at"),
+    @Index(name = "idx_reservation_member_status", columnList = "member_id, status"),
+    @Index(name = "idx_reservation_status_deadline", columnList = "status, pickup_deadline")
+})
 public class BookReservation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -312,7 +330,11 @@ Mapped to Entity: `com.nikunj.library.model.FineRecord`
 **JPA Mapping (`FineRecord.java`)**:
 ```java
 @Entity
-@Table(name = "fine_records")
+@Table(name = "fine_records", indexes = {
+    @Index(name = "idx_fines_member_paid", columnList = "member_id, paid"),
+    @Index(name = "idx_fines_borrow_paid", columnList = "borrow_id, paid"),
+    @Index(name = "idx_fines_paid", columnList = "paid")
+})
 public class FineRecord {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -342,9 +364,29 @@ public class FineRecord {
 
 ---
 
+## ⚡ 8. Database Indexes & Query Optimization (Phase 6)
+
+To prevent Sequential Scans ($O(N)$ operations) on large catalog and loan volumes, composite and single-column B-Tree indexes are defined across high-traffic query paths:
+
+| Table | Index Name | Indexed Columns | Query Pattern / Target Operations |
+|---|---|---|---|
+| `books` | `idx_books_title_author` | `(title, author)` | Multi-column catalog search & ordering (`LOWER(title) LIKE ... OR LOWER(author) LIKE ...`) |
+| `books` | `idx_books_author` | `(author)` | Direct author filtering |
+| `borrow_records` | `idx_borrow_returned_due_date` | `(returned, due_date)` | Nightly overdue reconciliation worker (`findByReturnedFalseAndDueDateBefore`) |
+| `borrow_records` | `idx_borrow_member_id` | `(member_id)` | Member loan history lookups |
+| `borrow_records` | `idx_borrow_book_id` | `(book_id)` | Book circulation history |
+| `book_reservations` | `idx_reservation_book_status_fifo` | `(book_id, status, reserved_at)` | FIFO waitlist dispatching on return (`findFirstByBookIdAndStatusOrderByReservedAtAsc`) |
+| `book_reservations` | `idx_reservation_member_status` | `(member_id, status)` | Patron reservation checks & duplicate waitlist prevention |
+| `book_reservations` | `idx_reservation_status_deadline` | `(status, pickup_deadline)` | 48-hour pickup expiration worker queries |
+| `fine_records` | `idx_fines_member_paid` | `(member_id, paid)` | Patron unpaid liability inquiries (`findByMemberMemberIdAndPaidFalse`) |
+| `fine_records` | `idx_fines_borrow_paid` | `(borrow_id, paid)` | Idempotent fine check during reconciliation (`findByBorrowRecordBorrowIdAndPaidFalse`) |
+| `fine_records` | `idx_fines_paid` | `(paid)` | Library-wide outstanding fine audits (`findByPaidFalse`) |
+
+---
+
 ## ⚙️ JPA Configuration Notes (`application.properties`)
 
-- `spring.jpa.hibernate.ddl-auto=update`: Hibernate automatically synchronizes Java entity definitions with PostgreSQL database tables.
+- `spring.jpa.hibernate.ddl-auto=update`: Hibernate automatically synchronizes Java entity definitions with PostgreSQL database tables, including DDL index creation.
 - `spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect`: Configures Hibernate dialect for PostgreSQL compatibility.
 
 

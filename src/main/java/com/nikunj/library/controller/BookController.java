@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.nikunj.library.dto.BookResponse;
@@ -29,6 +30,11 @@ public class BookController {
     @GetMapping
     public List<BookResponse> getAllBook() {
         return bookService.displayBook();
+    }
+
+    @GetMapping("/search")
+    public List<BookResponse> searchBooks(@RequestParam(name = "query", required = false) String query) {
+        return bookService.searchBooks(query);
     }
 
     @PostMapping

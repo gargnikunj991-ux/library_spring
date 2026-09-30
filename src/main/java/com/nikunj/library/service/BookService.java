@@ -46,6 +46,18 @@ public class BookService {
         return responses;
     }
 
+    public List<BookResponse> searchBooks(String query) {
+        if (query == null || query.trim().isEmpty()) {
+            return displayBook();
+        }
+        List<Book> books = bookRepository.searchBooks(query.trim());
+        List<BookResponse> responses = new ArrayList<>();
+        for (Book book : books) {
+            responses.add(mapToBookResponse(book));
+        }
+        return responses;
+    }
+
     public void deleteBook(Long id) {
         Book book = bookRepository.findById(id).orElseThrow(() -> new BookNotFoundException("Book Not found"));
         bookRepository.delete(book);

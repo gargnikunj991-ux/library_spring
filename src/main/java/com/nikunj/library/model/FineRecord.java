@@ -8,12 +8,17 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "fine_records")
+@Table(name = "fine_records", indexes = {
+    @Index(name = "idx_fines_member_paid", columnList = "member_id, paid"),
+    @Index(name = "idx_fines_borrow_paid", columnList = "borrow_id, paid"),
+    @Index(name = "idx_fines_paid", columnList = "paid")
+})
 public class FineRecord {
 
     @Id

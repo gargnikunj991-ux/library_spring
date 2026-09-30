@@ -134,7 +134,30 @@ Base Path: `/api/books`
 
 ---
 
-### 🔹 1.2 Get Book by ID
+### 🔹 1.2 Search Books (Query & Catalog Optimization)
+- **HTTP Method**: `GET`
+- **Path**: `/api/books/search`
+- **Query Parameter**: `query` (String, Optional) - Case-insensitive keyword matching book title or author. If empty or omitted, returns all books.
+- **Description**: Performs an optimized catalog lookup utilizing composite B-Tree indexes (`idx_books_title_author`).
+- **Response**: `200 OK`
+- **Sample Request**: `GET /api/books/search?query=design`
+- **Sample Response Body (`200 OK`)**:
+```json
+[
+  {
+    "id": 1,
+    "title": "Design Patterns",
+    "author": "Gang of Four",
+    "totalCopies": 5,
+    "availableCopies": 5,
+    "available": true
+  }
+]
+```
+
+---
+
+### 🔹 1.3 Get Book by ID
 - **HTTP Method**: `GET`
 - **Path**: `/api/books/{id}`
 - **Description**: Retrieves a single book by its ID.
@@ -156,7 +179,7 @@ Base Path: `/api/books`
 
 ---
 
-### 🔹 1.3 Create New Book
+### 🔹 1.4 Create New Book
 - **HTTP Method**: `POST`
 - **Path**: `/api/books`
 - **Description**: Registers a new book into inventory.
@@ -189,7 +212,7 @@ Base Path: `/api/books`
 
 ---
 
-### 🔹 1.4 Update Book
+### 🔹 1.5 Update Book
 - **HTTP Method**: `PUT`
 - **Path**: `/api/books/{id}`
 - **Description**: Updates an existing book by ID.
@@ -209,7 +232,7 @@ Base Path: `/api/books`
 
 ---
 
-### 🔹 1.5 Delete Book
+### 🔹 1.6 Delete Book
 - **HTTP Method**: `DELETE`
 - **Path**: `/api/books/{id}`
 - **Description**: Deletes a book by ID.

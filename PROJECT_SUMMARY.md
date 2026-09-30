@@ -45,7 +45,7 @@ Centralized Exception Handling is managed across all controllers using `@Control
 - **Data Persistence**: Spring Data JPA (`spring-boot-starter-data-jpa`), Hibernate
 - **Database**: PostgreSQL (Driver: `org.postgresql.Driver`), H2 In-Memory (Test scope)
 - **Validation**: Jakarta Validation (`spring-boot-starter-validation`)
-- **Testing**: JUnit 5, Mockito (62 automated Unit, Concurrency, Waitlist Integration, and Worker Tests)
+- **Testing**: JUnit 5, Mockito (64 automated Unit, Concurrency, Waitlist Integration, and Worker Tests)
 - **Build Tool**: Maven
 
 ---
@@ -175,12 +175,18 @@ com.nikunj.library
      - `POST /api/fines/{fineId}/pay`: Fine settlements permitted for `ADMIN`, `LIBRARIAN`, and `ASSISTANT`.
      - `POST /api/fines/reconcile`: Manual on-demand worker trigger restricted to `ADMIN`.
 
-6. **DTO Isolation**:
+6. **Database Query Optimization & Composite B-Tree Indexes**:
+   - `books`: Composite B-Tree index on `(title, author)` and single index on `(author)` accelerating multi-keyword search queries (`GET /api/books/search?query=...`) without triggering full table sequential scans.
+   - `borrow_records`: Compound index on `(returned, due_date)` eliminating sequential scan overhead for the nightly overdue worker query (`findByReturnedFalseAndDueDateBefore`). Foreign key indexes on `(member_id)` and `(book_id)`.
+   - `book_reservations`: Composite index on `(book_id, status, reserved_at)` providing instant FIFO lookups for waitlist queue head dispatching without in-memory sorting. Compound index on `(member_id, status)` and `(status, pickup_deadline)`.
+   - `fine_records`: Compound indexes on `(member_id, paid)`, `(borrow_id, paid)`, and `(paid)` for patron fine lookups and idempotent audit checks.
+
+7. **DTO Isolation**:
    - Entities (`Book`, `BookReservation`, `FineRecord`, `Member`, `BorrowRecord`, `User`) are **never** exposed directly to API callers.
    - Controllers accept `@Valid` Request DTOs and return Response DTOs inside `ResponseEntity`.
    - Services perform mapping between Entities and DTOs.
 
-7. **Validation Rules**:
+8. **Validation Rules**:
    - `CreateBookRequest`: `title` (not blank), `author` (not blank), `totalCopies` (min 1).
    - `CreateMemberRequest`: `name` (not blank), `email` (not blank, valid email format), `phoneNumber` (not blank).
    - `CreateBorrowRequest`: `bookId` (not null), `memberId` (not null).

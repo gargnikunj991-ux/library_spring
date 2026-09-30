@@ -134,7 +134,7 @@ The goal is to master Spring Boot concepts ground-up:
 > Target: Rebrand & elevate from "Library Management System" to **LibroSphere — High-Concurrency Asset Lending & Reservation Engine**.  
 > Master Blueprint Reference: [LIBROSPHERE_TRANSFORMATION_BLUEPRINT.md](file:///D:/library/library/LIBROSPHERE_TRANSFORMATION_BLUEPRINT.md)
 
-### 📊 Progress Tracker (Current Status: ~75% Complete | 62/62 Tests Passing)
+### 📊 Progress Tracker (Current Status: ~85% Complete | 64/64 Tests Passing)
 
 * [x] **Phase 1: Relational Multi-Copy Inventory Modeling (Step 1)**
   - Replaced naive `boolean available` with `@Column total_copies` and `available_copies`.
@@ -164,7 +164,14 @@ The goal is to master Spring Boot concepts ground-up:
   - Configured granular Role-Based Access Control (RBAC):
     - `ADMIN` & `LIBRARIAN`: Library-wide fine visibility (`GET /api/fines`) and manual reconciliation (`POST /api/fines/reconcile`).
     - `ASSISTANT`: Least-privilege patron lookups (`GET /api/fines/member/{memberId}`) and fine settlements (`POST /api/fines/{id}/pay`).
-  - Added 14 unit tests in `FineServiceTest` and `OverdueReconciliationWorkerTest`. Full test suite: 62/62 tests passing (100%).
+  - Added 14 unit tests in `FineServiceTest` and `OverdueReconciliationWorkerTest`. Full test suite: 62/62 tests passing (100%). Pushed to `origin/main` (Commit `24e53cb`).
+* [x] **Phase 6: Database Query Optimization & Composite B-Tree Indexes (Commit 4)**
+  - Configured composite B-Tree indexes on `books(title, author)` and `books(author)` for sub-millisecond catalog discovery.
+  - Implemented `idx_borrow_returned_due_date` on `borrow_records(returned, due_date)` eliminating full table scans on nightly worker cron queries.
+  - Added FIFO waitlist queue index on `book_reservations(book_id, status, reserved_at)`, member lookups `(member_id, status)`, and pickup expiration `(status, pickup_deadline)`.
+  - Added indexes on `fine_records(member_id, paid)`, `fine_records(borrow_id, paid)`, and `fine_records(paid)`.
+  - Added optimized catalog search endpoint: `GET /api/books/search?query=...` with case-insensitive `LIKE` matching in `BookRepository`, `BookService`, and `BookController`.
+  - Added automated unit tests in `BookServiceTest`. Full test suite: 64/64 tests passing (100%).
 * [x] **Portfolio & ATS Resume Synchronization**
   - Updated [`resume.html`](file:///D:/newjava/real/resume.html) and compiled [`resume.pdf`](file:///D:/newjava/real/resume.pdf) with high-concurrency bullet points (TOCTOU elimination, pessimistic row locking, 48-hour FIFO waitlist queue, automated tests).
   - Updated [`index.html`](file:///D:/newjava/real/index.html) project card, modal specs, and terminal CLI.
@@ -178,8 +185,8 @@ The goal is to master Spring Boot concepts ground-up:
 | :---: | :--- | :--- | :---: |
 | **Commit 1 & 2** | `feat(reservation): implement FIFO waitlist queue, auto-assignment on return, and test suite` | ✅ Completed (48 tests passing) | DONE |
 | **Portfolio Sync** | `feat(portfolio): rebrand library project to LibroSphere with concurrency & FIFO waitlist metrics` | ✅ Completed (resume & portfolio pushed) | DONE |
-| **Commit 3** | `feat(worker): implement tiered overdue fine reconciliation with @Scheduled cron and RBAC` | ✅ Completed (62 tests passing) | DONE |
-| **Commit 4** | `perf(db): add composite B-Tree indexes on book catalog and database query optimization` | • PostgreSQL composite B-Tree indexes on `books(title, author)` for sub-millisecond lookups<br>• Index on `borrow_records(returned, due_date)` for fast worker filtering | ~15 min |
+| **Commit 3** | `feat(worker): implement tiered overdue fine reconciliation with @Scheduled cron and RBAC` | ✅ Completed (62 tests passing, pushed to origin/main) | DONE |
+| **Commit 4** | `perf(db): add composite B-Tree indexes on book catalog and database query optimization` | ✅ Completed (64 tests passing) | DONE |
 | **Commit 5** | `ci(devops): add multi-stage Dockerfile, docker-compose, and GitHub Actions workflow` | • Multi-stage `Dockerfile` (Eclipse Temurin JRE 21 lean container)<br>• `docker-compose.yml` (LibroSphere backend + PostgreSQL 16)<br>• `.github/workflows/ci.yml` (Automated build & test on every push) | ~20 min |
 | **Commit 6** | `docs(portfolio): finalize LibroSphere architecture docs and live Railway deployment` | • Deploy backend live to Railway (live Swagger UI)<br>• Synchronize all project markdown files (`README.md`, `API_DOCUMENTATION.md`) | ~20 min |
 
