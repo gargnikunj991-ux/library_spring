@@ -462,7 +462,86 @@ Base Path: `/api/reservations`
 
 ---
 
-## ⚠️ 5. Global Error Handling & HTTP Status Codes
+## 💰 5. Fine Management API Endpoints (`/api/fines`)
+
+Base Path: `/api/fines`
+
+### 🔹 5.1 Get All Fines (System-wide Ledger)
+- **HTTP Method**: `GET`
+- **Path**: `/api/fines`
+- **Description**: Retrieves all recorded overdue fines across the entire library system.
+- **Authorization**: Required (`Bearer <accessToken>`). Roles: `ADMIN`, `LIBRARIAN`.
+- **Response**: `200 OK` (list of `FineResponse`)
+- **Sample Response Body**:
+```json
+[
+  {
+    "fineId": 1,
+    "borrowId": 12,
+    "bookId": 3,
+    "bookTitle": "Designing Data-Intensive Applications",
+    "memberId": 5,
+    "memberName": "Alice Smith",
+    "amount": 30.00,
+    "paid": false,
+    "calculatedAt": "2026-09-30T00:00:00",
+    "paidAt": null
+  }
+]
+```
+
+---
+
+### 🔹 5.2 Get Member Fines (Least-Privilege Patron Lookup)
+- **HTTP Method**: `GET`
+- **Path**: `/api/fines/member/{memberId}`
+- **Description**: Retrieves all fine records belonging to a specific patron by `memberId`.
+- **Authorization**: Required (`Bearer <accessToken>`). Roles: `ADMIN`, `LIBRARIAN`, `ASSISTANT`.
+- **Path Variable**: `memberId` (Long)
+- **Response**:
+  - `200 OK` (list of `FineResponse`)
+  - `404 Not Found` if member does not exist (`"Member not found with id: X"`)
+
+---
+
+### 🔹 5.3 Pay / Settle an Overdue Fine
+- **HTTP Method**: `POST`
+- **Path**: `/api/fines/{fineId}/pay`
+- **Description**: Marks an outstanding fine as settled and records the payment timestamp.
+- **Authorization**: Required (`Bearer <accessToken>`). Roles: `ADMIN`, `LIBRARIAN`, `ASSISTANT`.
+- **Path Variable**: `fineId` (Long)
+- **Response**:
+  - `200 OK` returning updated `FineResponse` with `paid: true` and `paidAt` timestamp.
+  - `404 Not Found` if fine ID does not exist (`"Fine record not found with id: X"`).
+  - `400 Bad Request` if fine was already paid (`"Fine has already been settled"`).
+- **Sample Response Body**:
+```json
+{
+  "fineId": 1,
+  "borrowId": 12,
+  "bookId": 3,
+  "bookTitle": "Designing Data-Intensive Applications",
+  "memberId": 5,
+  "memberName": "Alice Smith",
+  "amount": 30.00,
+  "paid": true,
+  "calculatedAt": "2026-09-30T00:00:00",
+  "paidAt": "2026-09-30T19:40:00"
+}
+```
+
+---
+
+### 🔹 5.4 Manually Trigger Overdue Fine Reconciliation
+- **HTTP Method**: `POST`
+- **Path**: `/api/fines/reconcile`
+- **Description**: Manually triggers the overdue fine reconciliation engine on demand (in addition to nightly midnight cron).
+- **Authorization**: Required (`Bearer <accessToken>`). Role: `ADMIN`.
+- **Response**: `200 OK` (`"Reconciliation completed. Reconciled X overdue loan(s)."`)
+
+---
+
+## ⚠️ 6. Global Error Handling & HTTP Status Codes
 
 ### Application Exceptions (Centralized in `GlobalExceptionHandler.java`):
 
@@ -473,6 +552,7 @@ Base Path: `/api/reservations`
 | `BookUnavailableException` | `404 NOT_FOUND` | `"Book Not available"` |
 | `BorrowRecordNotFoundException` | `404 NOT_FOUND` | `"Borrow Record Not Found"` |
 | `ReservationNotFoundException` | `404 NOT_FOUND` | `"Reservation Not Found"` |
+| `FineNotFoundException` | `404 NOT_FOUND` | `"Fine Record Not Found"` / Detail message |
 | `DuplicateReservationException` | `409 CONFLICT` | `"Member already has an active reservation for this book"` |
 | `IllegalStateException` | `400 BAD_REQUEST` | Message string |
 | `TokenRefreshException` | `401 UNAUTHORIZED` | `"Failed for [token]: message"` |

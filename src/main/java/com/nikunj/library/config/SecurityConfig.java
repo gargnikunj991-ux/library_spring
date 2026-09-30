@@ -69,6 +69,10 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.POST,"/api/borrow/return/**").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
             .requestMatchers(HttpMethod.POST,"/api/reservations/**").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
             .requestMatchers(HttpMethod.GET,"/api/reservations/**").hasAnyRole("ADMIN","LIBRARIAN", "ASSISTANT")
+            .requestMatchers(HttpMethod.POST, "/api/fines/reconcile").hasRole("ADMIN")
+            .requestMatchers(HttpMethod.GET, "/api/fines/member/**").hasAnyRole("ADMIN", "LIBRARIAN", "ASSISTANT")
+            .requestMatchers(HttpMethod.POST, "/api/fines/*/pay").hasAnyRole("ADMIN", "LIBRARIAN", "ASSISTANT")
+            .requestMatchers(HttpMethod.GET, "/api/fines").hasAnyRole("ADMIN", "LIBRARIAN")
             .anyRequest().authenticated()
         );
 

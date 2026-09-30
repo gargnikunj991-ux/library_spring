@@ -45,7 +45,7 @@ Centralized Exception Handling is managed across all controllers using `@Control
 - **Data Persistence**: Spring Data JPA (`spring-boot-starter-data-jpa`), Hibernate
 - **Database**: PostgreSQL (Driver: `org.postgresql.Driver`), H2 In-Memory (Test scope)
 - **Validation**: Jakarta Validation (`spring-boot-starter-validation`)
-- **Testing**: JUnit 5, Mockito (48 automated Unit, Concurrency, and Waitlist Integration Tests)
+- **Testing**: JUnit 5, Mockito (62 automated Unit, Concurrency, Waitlist Integration, and Worker Tests)
 - **Build Tool**: Maven
 
 ---
@@ -56,38 +56,44 @@ Base package: `com.nikunj.library`
 
 ```
 com.nikunj.library
-├── LibraryApplication.java           # Main Spring Boot Application Entry Point (Loads .env properties via Dotenv)
+├── LibraryApplication.java           # Main Spring Boot Application Entry Point (Loads .env properties via Dotenv, @EnableScheduling)
 ├── config/                           # Security & Application Configuration
 │   ├── OpenApiConfig.java            # Swagger 3.0 OpenAPI metadata & JWT Bearer Security Scheme configuration
-│   ├── SecurityConfig.java           # Spring Security filter chain setup (stateless JWT, 401 AuthenticationEntryPoint, 403 AccessDeniedHandler)
+│   ├── SecurityConfig.java           # Spring Security filter chain setup (stateless JWT, 401 AuthenticationEntryPoint, 403 AccessDeniedHandler, RBAC)
 │   └── JwtAuthenticationFilter.java  # JWT token validation filter (OncePerRequestFilter, no @Component)
 ├── controller/                       # REST Controller Layer
 │   ├── AuthController.java           # REST Endpoints for /auth (login & register integration)
 │   ├── BookController.java           # REST Endpoints for /api/books
 │   ├── MemberController.java         # REST Endpoints for /api/members
 │   ├── Borrowcontroller.java         # REST Endpoints for /api/borrow (POST /api/borrow & POST /api/borrow/return/{borrowId})
+│   ├── FineController.java           # REST Endpoints for /api/fines (RBAC audit, member lookup, fine payments)
 │   └── ReservationController.java    # REST Endpoints for /api/reservations (join waitlist, cancel, queue queries)
 ├── service/                          # Business Logic & Service Layer
 │   ├── AuthService.java              # User registration logic with PasswordEncoder & login support
 │   ├── BookService.java              # Book CRUD logic & DTO mapping
 │   ├── BorrowService.java            # Book borrowing & return transaction logic (with auto-reservation allocation)
 │   ├── CustomUserDetailsService.java# Spring Security UserDetailsService implementation
+│   ├── FineService.java              # Tiered overdue calculation, idempotent reconciliation, and payment settlement
 │   ├── JwtService.java               # JWT token generation and validation service
 │   ├── MemberService.java            # Member CRUD logic & DTO mapping
 │   ├── RefreshTokenService.java      # Refresh token creation, expiry verification, and rotation logic
 │   └── ReservationService.java       # FIFO waitlist queueing, 48h pickup deadline, and reallocation logic
+├── worker/                           # Background Cron Schedulers
+│   └── OverdueReconciliationWorker.java # Nightly midnight @Scheduled cron auditing overdue loans and accruing fines
 ├── repository/                       # Data Access Layer (Spring Data JPA)
 │   ├── BookRepository.java           # JpaRepository<Book, Long> with pessimistic write lock (findByIdForUpdate)
 │   ├── BookReservationRepository.java# JpaRepository<BookReservation, Long> with FIFO query methods
-│   ├── BorrowRecordRepository.java   # JpaRepository<BorrowRecord, Long>
+│   ├── BorrowRecordRepository.java   # JpaRepository<BorrowRecord, Long> with unreturned overdue lookups
+│   ├── FineRecordRepository.java     # JpaRepository<FineRecord, Long> with member & loan lookups
 │   ├── MemberRepository.java         # JpaRepository<Member, Long>
 │   ├── RefreshTokenRepository.java   # JpaRepository<RefreshToken, Long>
 │   └── UserRepository.java           # JpaRepository<User, Long>
 ├── model/                            # JPA Database Entities
 │   ├── Book.java                     # "books" table entity (totalCopies, availableCopies)
 │   ├── BookReservation.java          # "book_reservations" table entity (FIFO waitlist queue, pickupDeadline)
-│   ├── Member.java                   # "members" table entity
 │   ├── BorrowRecord.java             # "borrow_records" table entity with Foreign Keys
+│   ├── FineRecord.java               # "fine_records" table entity tracking accrued liabilities & payments
+│   ├── Member.java                   # "members" table entity
 │   ├── RefreshToken.java             # "refresh_tokens" table entity for JWT refresh token rotation (@ManyToOne User relation)
 │   ├── ReservationStatus.java        # Enum (WAITING, NOTIFIED_READY, CLAIMED, EXPIRED, CANCELLED)
 │   └── User.java                     # "users" table entity for authentication (Role: ADMIN, LIBRARIAN, ASSISTANT)
@@ -98,6 +104,7 @@ com.nikunj.library
 │   ├── CreateBorrowRequest.java      # Inbound DTO for borrowing a book
 │   ├── CreateMemberRequest.java      # Inbound DTO for creating/updating Members
 │   ├── CreateReservationRequest.java # Inbound DTO for placing a reservation
+│   ├── FineResponse.java             # Outbound DTO exposing fine details, book title, and payment status
 │   ├── LoginRequest.java             # Inbound DTO for authentication
 │   ├── LoginResponse.java            # Outbound DTO containing accessToken, refreshToken, tokenType
 │   ├── MemberResponse.java           # Outbound DTO for Member responses
@@ -109,6 +116,7 @@ com.nikunj.library
     ├── BookUnavailableException.java # Thrown when Book is already borrowed (HTTP 404)
     ├── BorrowRecordNotFoundException.java # Thrown when Borrow Record ID is not found (HTTP 404)
     ├── DuplicateReservationException.java# Thrown when Member already has active reservation (HTTP 409)
+    ├── FineNotFoundException.java    # Thrown when Fine Record ID is not found (HTTP 404)
     ├── MemberNotFoundException.java  # Thrown when Member ID is not found (HTTP 404)
     ├── ReservationNotFoundException.java # Thrown when Reservation ID is not found (HTTP 404)
     ├── TokenRefreshException.java    # Thrown when Refresh Token is expired or invalid (HTTP 401)
@@ -154,12 +162,25 @@ com.nikunj.library
    - `RefreshTokenService` validates expiration and issues new access tokens on `POST /auth/refresh`. If token expired or revoked, `TokenRefreshException` is thrown.
    - `POST /auth/logout` requires authentication and a valid role (`ADMIN`, `LIBRARIAN`, `ASSISTANT`), delegating to `RefreshTokenService.revokeByUsername()` to set `revoked = true` in PostgreSQL.
 
-5. **DTO Isolation**:
-   - Entities (`Book`, `BookReservation`, `Member`, `BorrowRecord`, `User`) are **never** exposed directly to API callers.
+5. **Tiered Overdue Fine Reconciliation & Least-Privilege RBAC (`/api/fines`)**:
+   - `OverdueReconciliationWorker` runs nightly at midnight (`@Scheduled(cron = "0 0 0 * * *")`).
+   - Reconciles unreturned loans where `dueDate < LocalDate.now()` using a **graduated tiered penalty**:
+     - **Days 1 to 5**: ₹1 / day (Max ₹5)
+     - **Days 6 to 15**: ₹5 / day (Max ₹50; cumulative ₹55)
+     - **Day 16 onwards**: ₹10 / day
+   - **Idempotency**: Calculates total days overdue from `dueDate` to current date and updates or creates the `FineRecord` deterministically. Never duplicates charges regardless of worker restart or re-runs.
+   - **Role-Based Access Control (RBAC)**:
+     - `GET /api/fines`: Library-wide ledger overview restricted to `ADMIN` and `LIBRARIAN`.
+     - `GET /api/fines/member/{memberId}`: Least-privilege patron lookups permitted for `ADMIN`, `LIBRARIAN`, and `ASSISTANT`.
+     - `POST /api/fines/{fineId}/pay`: Fine settlements permitted for `ADMIN`, `LIBRARIAN`, and `ASSISTANT`.
+     - `POST /api/fines/reconcile`: Manual on-demand worker trigger restricted to `ADMIN`.
+
+6. **DTO Isolation**:
+   - Entities (`Book`, `BookReservation`, `FineRecord`, `Member`, `BorrowRecord`, `User`) are **never** exposed directly to API callers.
    - Controllers accept `@Valid` Request DTOs and return Response DTOs inside `ResponseEntity`.
    - Services perform mapping between Entities and DTOs.
 
-6. **Validation Rules**:
+7. **Validation Rules**:
    - `CreateBookRequest`: `title` (not blank), `author` (not blank), `totalCopies` (min 1).
    - `CreateMemberRequest`: `name` (not blank), `email` (not blank, valid email format), `phoneNumber` (not blank).
    - `CreateBorrowRequest`: `bookId` (not null), `memberId` (not null).

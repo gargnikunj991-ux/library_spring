@@ -71,6 +71,14 @@ public ResponseEntity<String> handleException(ReservationNotFoundException ex){
     );
 }
 
+@ExceptionHandler(FineNotFoundException.class)
+public ResponseEntity<String> handleException(FineNotFoundException ex){
+    return new ResponseEntity<>(
+        ex.getMessage() != null ? ex.getMessage() : "Fine Record Not Found",
+        HttpStatus.NOT_FOUND
+    );
+}
+
 @ExceptionHandler(DuplicateReservationException.class)
 public ResponseEntity<String> handleException(DuplicateReservationException ex){
     return new ResponseEntity<>(

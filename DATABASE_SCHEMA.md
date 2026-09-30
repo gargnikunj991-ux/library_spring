@@ -30,6 +30,22 @@ This document describes the PostgreSQL database schema, JPA entity mapping, tabl
         │                   │     due_date                        │             │     revoked             │
         │                   │     return_date                     │             └─────────────────────────┘
         │                   │     returned                        │
+        │                   └──────────────┬──────────────────────┘
+        │                                  │
+        │                                  │ 1
+        │                                  │
+        │                                  │ N
+        │                                  ▼
+        │                   ┌─────────────────────────────────────┐
+        │                   │             fine_records            │
+        │                   ├─────────────────────────────────────┤
+        │                   │ PK  fine_id                         │
+        │                   │ FK  borrow_id ──► borrow_records    │
+        │                   │ FK  member_id ──► members(member_id)│
+        │                   │     amount                          │
+        │                   │     paid                            │
+        │                   │     calculated_at                   │
+        │                   │     paid_at                         │
         │                   └─────────────────────────────────────┘
         │
         │ N
@@ -274,6 +290,53 @@ public class BookReservation {
 
     @Column(name = "pickup_deadline")
     private LocalDateTime pickupDeadline;
+}
+```
+
+---
+
+### 7. `fine_records` Table
+
+Mapped to Entity: `com.nikunj.library.model.FineRecord`
+
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
+|---|---|---|---|---|
+| `fine_id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for the fine record |
+| `borrow_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "borrow_id", nullable = false)` | Foreign Key -> `borrow_records(borrow_id)` | References the overdue loan |
+| `member_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "member_id", nullable = false)` | Foreign Key -> `members(member_id)` | References the liable member |
+| `amount` | `NUMERIC(10,2)` | `@Column(nullable = false, precision = 10, scale = 2)` | NOT NULL | Accrued fine amount in INR |
+| `paid` | `BOOLEAN` | Field: `paid` | NOT NULL, Default `false` | Settlement status flag |
+| `calculated_at` | `TIMESTAMP` | `@Column(name = "calculated_at", nullable = false)` | NOT NULL | Timestamp when fine was last reconciled |
+| `paid_at` | `TIMESTAMP` | `@Column(name = "paid_at")` | Nullable | Timestamp when fine was settled |
+
+**JPA Mapping (`FineRecord.java`)**:
+```java
+@Entity
+@Table(name = "fine_records")
+public class FineRecord {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long fineId;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "borrow_id", nullable = false)
+    private BorrowRecord borrowRecord;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal amount = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private boolean paid = false;
+
+    @Column(name = "calculated_at", nullable = false)
+    private LocalDateTime calculatedAt = LocalDateTime.now();
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
 }
 ```
 
