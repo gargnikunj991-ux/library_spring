@@ -45,7 +45,8 @@ Centralized Exception Handling is managed across all controllers using `@Control
 - **Data Persistence**: Spring Data JPA (`spring-boot-starter-data-jpa`), Hibernate
 - **Database**: PostgreSQL (Driver: `org.postgresql.Driver`), H2 In-Memory (Test scope)
 - **Validation**: Jakarta Validation (`spring-boot-starter-validation`)
-- **Testing**: JUnit 5, Mockito (64 automated Unit, Concurrency, Waitlist Integration, and Worker Tests)
+- **Testing**: JUnit 5, Mockito (66 automated Unit, Concurrency, Waitlist Integration, and Worker Tests)
+- **DevOps**: Multi-stage Dockerfile (Temurin JRE 21), Docker Compose (PostgreSQL 16), GitHub Actions CI
 - **Build Tool**: Maven
 
 ---
@@ -58,6 +59,7 @@ Base package: `com.nikunj.library`
 com.nikunj.library
 ├── LibraryApplication.java           # Main Spring Boot Application Entry Point (Loads .env properties via Dotenv, @EnableScheduling)
 ├── config/                           # Security & Application Configuration
+│   ├── DataInitializer.java          # Seeds default ADMIN user ('admin' / 'admin123') on startup via CommandLineRunner
 │   ├── OpenApiConfig.java            # Swagger 3.0 OpenAPI metadata & JWT Bearer Security Scheme configuration
 │   ├── SecurityConfig.java           # Spring Security filter chain setup (stateless JWT, 401 AuthenticationEntryPoint, 403 AccessDeniedHandler, RBAC)
 │   └── JwtAuthenticationFilter.java  # JWT token validation filter (OncePerRequestFilter, no @Component)

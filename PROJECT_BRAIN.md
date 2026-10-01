@@ -134,7 +134,7 @@ The goal is to master Spring Boot concepts ground-up:
 > Target: Rebrand & elevate from "Library Management System" to **LibroSphere — High-Concurrency Asset Lending & Reservation Engine**.  
 > Master Blueprint Reference: [LIBROSPHERE_TRANSFORMATION_BLUEPRINT.md](file:///D:/library/library/LIBROSPHERE_TRANSFORMATION_BLUEPRINT.md)
 
-### 📊 Progress Tracker (Current Status: ~85% Complete | 64/64 Tests Passing)
+#### 📊 Progress Tracker (Current Status: ~95% Complete | 66/66 Tests Passing)
 
 * [x] **Phase 1: Relational Multi-Copy Inventory Modeling (Step 1)**
   - Replaced naive `boolean available` with `@Column total_copies` and `available_copies`.
@@ -172,8 +172,18 @@ The goal is to master Spring Boot concepts ground-up:
   - Added indexes on `fine_records(member_id, paid)`, `fine_records(borrow_id, paid)`, and `fine_records(paid)`.
   - Added optimized catalog search endpoint: `GET /api/books/search?query=...` with case-insensitive `LIKE` matching in `BookRepository`, `BookService`, and `BookController`.
   - Added automated unit tests in `BookServiceTest`. Full test suite: 64/64 tests passing (100%).
+* [x] **Phase 7: Security Hardening & Automated Admin Bootstrapping**
+  - Created `DataInitializer.java` utilizing `CommandLineRunner` to automatically seed an initial `ADMIN` user (`admin` / `admin123`) in PostgreSQL if not present, completely idempotent.
+  - Added unit test suite `DataInitializerTest.java` bringing the full automated test suite to 66 passing tests (100%).
+  - Fixed RBAC authorization route typo in `SecurityConfig.java` from `/api/member` to `/api/members`.
+  - Sanitized public `.env.example` secret placeholder to eliminate potential credential leakage in git.
+* [x] **Phase 8: DevOps Containerization & Continuous Integration (Commit 5)**
+  - Created multi-stage `Dockerfile` with Eclipse Temurin JDK 21 build stage and hardened, non-root Temurin JRE 21 runtime container.
+  - Created `.dockerignore` eliminating bloat and sensitive files from container build context.
+  - Created `docker-compose.yml` orchestrating PostgreSQL 16 Alpine with health checks, persistent volumes, and LibroSphere backend service.
+  - Created `.github/workflows/ci.yml` running automated Maven build and 66-test suite on all pushes and pull requests.
 * [x] **Portfolio & ATS Resume Synchronization**
-  - Updated [`resume.html`](file:///D:/newjava/real/resume.html) and compiled [`resume.pdf`](file:///D:/newjava/real/resume.pdf) with calibrated, natural engineering bullet points (pessimistic row locking, 48-hour FIFO waitlist queue, scheduled fine reconciliation, composite B-Tree indexes, and 64 automated tests).
+  - Updated [`resume.html`](file:///D:/newjava/real/resume.html) and compiled [`resume.pdf`](file:///D:/newjava/real/resume.pdf) with calibrated, natural engineering bullet points (pessimistic row locking, 48-hour FIFO waitlist queue, scheduled fine reconciliation, composite B-Tree indexes, and 66 automated tests).
   - Updated [`index.html`](file:///D:/newjava/real/index.html) project card and terminal CLI.
   - Pushed to `origin/master` (Commit `3ee055c`).
 
@@ -182,12 +192,13 @@ The goal is to master Spring Boot concepts ground-up:
 ### 📋 Remaining Execution Blueprint
 
 | Commit | Conventional Commit Message | Implementation Scope | Time Est. |
-| :---: | :--- | :--- | :---: |
+| :---: | :--- | :--- | :--- |
 | **Commit 1 & 2** | `feat(reservation): implement FIFO waitlist queue, auto-assignment on return, and test suite` | ✅ Completed (48 tests passing) | DONE |
 | **Portfolio Sync** | `feat(portfolio): rebrand library project to LibroSphere with concurrency & FIFO waitlist metrics` | ✅ Completed (resume & portfolio pushed) | DONE |
 | **Commit 3** | `feat(worker): implement tiered overdue fine reconciliation with @Scheduled cron and RBAC` | ✅ Completed (62 tests passing, pushed to origin/main) | DONE |
 | **Commit 4** | `perf(db): add composite B-Tree indexes on book catalog and database query optimization` | ✅ Completed (64 tests passing) | DONE |
-| **Commit 5** | `ci(devops): add multi-stage Dockerfile, docker-compose, and GitHub Actions workflow` | • Multi-stage `Dockerfile` (Eclipse Temurin JRE 21 lean container)<br>• `docker-compose.yml` (LibroSphere backend + PostgreSQL 16)<br>• `.github/workflows/ci.yml` (Automated build & test on every push) | ~20 min |
+| **Security & Bootstrap** | `feat(auth): add automated admin seeder DataInitializer, fix /api/members RBAC route, and sanitize .env.example` | ✅ Completed (66 tests passing) | DONE |
+| **Commit 5** | `ci(devops): add multi-stage Dockerfile, docker-compose, and GitHub Actions workflow` | ✅ Completed (Dockerfile, docker-compose.yml, .dockerignore, .github/workflows/ci.yml) | DONE |
 | **Commit 6** | `docs(portfolio): finalize LibroSphere architecture docs and live Railway deployment` | • Deploy backend live to Railway (live Swagger UI)<br>• Synchronize all project markdown files (`README.md`, `API_DOCUMENTATION.md`) | ~20 min |
 
 
