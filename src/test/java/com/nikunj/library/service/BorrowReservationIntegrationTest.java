@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -49,6 +50,7 @@ public class BorrowReservationIntegrationTest {
     private BookReservationRepository bookReservationRepository;
 
     @BeforeEach
+    @AfterEach
     void cleanUp() {
         borrowRecordRepository.deleteAll();
         bookReservationRepository.deleteAll();

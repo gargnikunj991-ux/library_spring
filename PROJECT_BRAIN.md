@@ -182,6 +182,7 @@ The goal is to master Spring Boot concepts ground-up:
   - Created `.dockerignore` eliminating bloat and sensitive files from container build context.
   - Created `docker-compose.yml` orchestrating PostgreSQL 16 Alpine with health checks, persistent volumes, and LibroSphere backend service.
   - Created `.github/workflows/ci.yml` running automated Maven build and 66-test suite on all pushes and pull requests.
+  - Hardened integration test teardown isolation across `BorrowConcurrencyIntegrationTest` and `BorrowReservationIntegrationTest` with bidirectional `@BeforeEach` and `@AfterEach` cascading entity cleanup, resolving foreign key constraint violations on Linux CI runners.
 * [x] **Portfolio & ATS Resume Synchronization**
   - Updated [`resume.html`](file:///D:/newjava/real/resume.html) and compiled [`resume.pdf`](file:///D:/newjava/real/resume.pdf) with calibrated, natural engineering bullet points (pessimistic row locking, 48-hour FIFO waitlist queue, scheduled fine reconciliation, composite B-Tree indexes, and 66 automated tests).
   - Updated [`index.html`](file:///D:/newjava/real/index.html) project card and terminal CLI.

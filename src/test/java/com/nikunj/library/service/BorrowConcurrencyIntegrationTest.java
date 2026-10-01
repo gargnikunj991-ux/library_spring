@@ -8,6 +8,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -19,6 +20,7 @@ import com.nikunj.library.exception.BookUnavailableException;
 import com.nikunj.library.model.Book;
 import com.nikunj.library.model.Member;
 import com.nikunj.library.repository.BookRepository;
+import com.nikunj.library.repository.BookReservationRepository;
 import com.nikunj.library.repository.BorrowRecordRepository;
 import com.nikunj.library.repository.MemberRepository;
 
@@ -40,8 +42,13 @@ public class BorrowConcurrencyIntegrationTest {
     @Autowired
     private BorrowRecordRepository borrowRecordRepository;
 
+    @Autowired
+    private BookReservationRepository bookReservationRepository;
+
     @BeforeEach
+    @AfterEach
     void cleanUp() {
+        bookReservationRepository.deleteAll();
         borrowRecordRepository.deleteAll();
         bookRepository.deleteAll();
         memberRepository.deleteAll();
