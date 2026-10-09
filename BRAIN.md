@@ -1,312 +1,120 @@
-# 🧠 BRAIN.md
+# 🧠 BRAIN.md -- Project Knowledge & State Index
 
-# Library Management System (Spring Boot)
-
-## Project Goal
-
-Build a production-style Library Management System while learning Spring Boot from the ground up.
-
-The objective is **not just to complete the project**, but to understand:
-
-* Spring Boot
-* REST APIs
-* JPA & Hibernate
-* PostgreSQL
-* Clean Architecture
-* Professional Backend Development
+> **Notice**: The authoritative, detailed Single Source of Truth for this project is maintained in [PROJECT_BRAIN.md](file:///D:/library/library/PROJECT_BRAIN.md). This file summarizes key learning milestones, architectural principles, and the current operational state.
 
 ---
 
-# Current Architecture
+## 🎯 1. Project Goal & Philosophy
+
+Build a production-grade **High-Concurrency Asset Lending & Waitlist Reservation Engine (LibroSphere)** using **Java 21**, **Spring Boot 4.1.0**, and **PostgreSQL 16**.
+
+The objective is to master real-world enterprise backend challenges:
+* **Clean Layered Architecture**: Controller → Service → Repository → PostgreSQL.
+* **Concurrency Control**: Eliminate TOCTOU race conditions via pessimistic row locking (`SELECT ... FOR UPDATE`).
+* **Waitlist Queuing Engine**: FIFO queue management for out-of-stock items with automated 48-hour pickup allocation.
+* **Scheduled Background Jobs**: Nightly `@Scheduled` cron worker calculating tiered overdue fines idempotently.
+* **Query Optimization**: High-performance composite B-Tree indexes for sub-millisecond catalog lookups.
+* **Stateless Security**: JWT authentication with cryptographic refresh token rotation and RBAC (`ADMIN`, `LIBRARIAN`, `ASSISTANT`).
+* **DevOps**: Multi-stage Docker packaging, Docker Compose orchestration, and GitHub Actions CI.
+
+---
+
+## 🏗️ 2. Current Architecture
 
 ```
-Client
-    ↓
-Controller
-    ↓
-Service
-    ↓
-Repository
-    ↓
-PostgreSQL
+[ Client / Postman / Swagger UI ]
+               ↓
+[ Spring Security Filter Chain ] (Stateless JWT, BCrypt, 401/403 handlers)
+               ↓
+      [ Controller Layer ]       (AuthController, BookController, MemberController,
+                                  Borrowcontroller, ReservationController, FineController)
+               ↓
+        [ Service Layer ]         (Transactions @Transactional, DTO Mapping, Business Invariants)
+               ↓
+      [ Repository Layer ]       (Spring Data JPA, Pessimistic Locking, Custom Queries)
+               ↓
+     [ PostgreSQL Database ]     (7 Tables: users, refresh_tokens, books, members,
+                                  borrow_records, book_reservations, fine_records)
 ```
 
----
-
-# Current Progress
-
-## Project Setup
-
-* [x] Spring Boot Project Created
-* [x] PostgreSQL Connected
-* [x] Hibernate Configured
-* [x] Automatic Table Creation
-* [x] Project Connected Successfully
-
----
-
-## Book Module
-
-### Entity
-
-* [x] Book Entity
-* [x] JPA Annotations
-* [x] ID Generation using IDENTITY
-
-### Repository
-
-* [x] BookRepository
-* [x] JpaRepository Integration
-
-### Service
-
-* [x] BookService Created
-* [x] Business Logic Moved From Controller
-
-### Controller
-
-Implemented APIs
-
-* [x] GET /api/books
-* [x] GET /api/books/{id}
-* [x] POST /api/books
-* [x] DELETE /api/books/{id}
-
----
-
-# Concepts Learned
-
-## Spring Boot
-
-* Spring Initializr
-* Dependency Injection
-* @Autowired
-* @Service
-* @RestController
-* @RequestMapping
-* @GetMapping
-* @PostMapping
-* @DeleteMapping
-* @PathVariable
-* @RequestBody
-
----
-
-## JPA / Hibernate
-
-* @Entity
-* @Table
-* @Id
-* @GeneratedValue
-* JpaRepository
-* findAll()
-* findById()
-* save()
-* deleteById()
-
----
-
-## Backend Concepts
-
-* REST API
-* CRUD Operations
-* JSON Request
-* JSON Response
-* HTTP Methods
-* Controller Layer
-* Service Layer
-* Repository Layer
-* Business Logic
-* Dependency Injection
-* Optional
-* Auto Increment IDs
-
----
-
-# Current Folder Structure
-
+**Background Async Workers**:
 ```
-config/
-    SecurityConfig
-
-controller/
-    BookController
-    MemberController
-    Borrowcontroller
-
-service/
-    BookService
-    MemberService
-    BorrowService
-
-repository/
-    BookRepository
-    MemberRepository
-    BorrowRecordRepository
-
-model/
-    Book
-    Member
-    BorrowRecord
-    User
-
-dto/
-    CreateBookRequest
-    BookResponse
-    CreateMemberRequest
-    MemberResponse
-    CreateBorrowRequest
-    BorrowResponse
-
-exception/
-    BookNotFoundException
-    MemberNotFoundException
-    BookUnavailableException
-    BorrowRecordNotFoundException
-    GlobalExceptionHandler
+[ OverdueReconciliationWorker ] (@Scheduled nightly cron at 00:00) ──► [ FineService ] ──► PostgreSQL
 ```
 
 ---
 
-# Completed Features
+## 📈 3. Completed Modules & Implementation Status
 
-## Book Module
+### ✅ All 8 Enterprise Phases Complete (66/66 Automated Tests Passing)
 
-* [x] PUT /api/books/{id}
-* [x] GET /api/books
-* [x] GET /api/books/{id}
-* [x] POST /api/books
-* [x] DELETE /api/books/{id}
-* [x] Validation
-* [x] Exception Handling
-* [x] DTO Isolation
+1. **Database & Infrastructure**:
+   - [x] PostgreSQL 16 connection with dynamic environment configuration (`.env` via `dotenv-java`).
+   - [x] Multi-stage `Dockerfile` and `docker-compose.yml`.
+   - [x] Automated GitHub Actions CI pipeline (`.github/workflows/ci.yml`).
+   - [x] Automated admin bootstrapping on startup via `DataInitializer` (`admin` / `admin123`).
 
----
+2. **Book Catalog & Concurrency Engine** (`/api/books`):
+   - [x] Multi-copy inventory modeling (`totalCopies`, `availableCopies`).
+   - [x] Pessimistic Write Lock (`@Lock(LockModeType.PESSIMISTIC_WRITE)`) in `BookRepository.findByIdForUpdate`.
+   - [x] Sub-millisecond catalog search endpoint `GET /api/books/search?query=...`.
+   - [x] Composite B-Tree indexes (`idx_books_title_author`, `idx_books_author`).
 
-## Member Module
+3. **Member Registry** (`/api/members`):
+   - [x] Full CRUD with validation (`@NotBlank`, `@Email`).
+   - [x] Isolated DTO contracts (`CreateMemberRequest`, `MemberResponse`).
 
-* [x] Member Entity
-* [x] Repository
-* [x] Service
-* [x] Controller
-* [x] CRUD APIs
+4. **Borrow & Return Engine** (`/api/borrow`):
+   - [x] Concurrency-safe checkout with atomic inventory decrement.
+   - [x] 14-day automatic due date calculation.
+   - [x] Return processing with automated FIFO waitlist detection: held copy locked directly for next waiting member rather than leaked to public stock.
 
----
+5. **FIFO Waitlist Reservation Queue** (`/api/reservations`):
+   - [x] `BookReservation` entity with statuses: `WAITING`, `NOTIFIED_READY`, `CLAIMED`, `EXPIRED`, `CANCELLED`.
+   - [x] FIFO priority sorting by `reservedAt ASC`.
+   - [x] 48-hour exclusive pickup window (`NOTIFIED_READY`).
+   - [x] Automatic reallocation to next patron on cancellation.
 
-## Borrow Module
+6. **Tiered Overdue Fine Reconciliation** (`/api/fines`):
+   - [x] `FineRecord` entity tracking member liabilities and payment status.
+   - [x] Graduated tiered formula: Days 1–5 (₹1/day), Days 6–15 (₹5/day), Day 16+ (₹10/day).
+   - [x] Nightly midnight cron worker (`OverdueReconciliationWorker`).
+   - [x] Idempotent calculations (no double-charging regardless of restarts).
+   - [x] Granular RBAC (`ADMIN` ledger audit & manual reconcile, `LIBRARIAN` & `ASSISTANT` patron payment settlement).
 
-* [x] Borrow Book (`POST /api/borrow`)
-* [x] Return Book (`POST /api/borrow/return/{borrowId}`)
-* [x] Due Date Calculation (14 Days)
-* [x] Book Availability State Synchronization
+7. **Security, User Model & Refresh Token Rotation** (`/auth`):
+   - [x] Stateless Spring Security (`SessionCreationPolicy.STATELESS`).
+   - [x] JJWT 0.12.7 access tokens + persisted UUID refresh tokens with rotation and revocation.
+   - [x] Role hierarchy: `ADMIN`, `LIBRARIAN`, `ASSISTANT`.
 
----
-
-## Security & Validation & Exception Handling
-
-* [x] Spring Security filter chain (`SecurityConfig`)
-* [x] User Entity (`users` table) with Role enum
-* [x] `@Valid`, `@NotBlank`, `@Email`, `@NotNull`
-* [x] `@ControllerAdvice` in `GlobalExceptionHandler`
-* [x] Custom exceptions
-
----
-
-# Future Features
-
-## Authentication & Security
-
-* [ ] JWT Authentication
-* [ ] Password Encryption (BCrypt)
-* [ ] Fine-grained Role-Based Access Control (Admin / Librarian / Member)
+8. **Automated Testing Suite**:
+   - [x] 66 automated tests across unit, integration, multi-threaded stress concurrency, and worker suites.
+   - [x] `BorrowConcurrencyIntegrationTest`: 10 concurrent threads validating zero double-checkouts under high contention.
 
 ---
 
-## Database & Querying
+## 📂 4. Current Package Structure
 
-* [ ] Pagination & Sorting (`Pageable`)
-* [ ] Book Search API (by title, author, category)
-* [ ] `@ManyToMany` / `@OneToMany` cascade mappings
-
----
-
-## Documentation
-
-* [ ] Swagger / OpenAPI Integration
-
----
-
-## Testing & Deployment
-
-* [ ] Unit Testing & Integration Testing
-* [ ] Dockerization
-* [ ] Production Deployment (Railway / Render)
-
+```
+com.nikunj.library
+├── LibraryApplication.java           # Entry Point (@EnableScheduling)
+├── config/                           # SecurityConfig, JwtAuthFilter, OpenApiConfig, DataInitializer
+├── controller/                       # Auth, Book, Member, Borrow, Reservation, Fine Controllers
+├── service/                          # AuthService, BookService, MemberService, BorrowService,
+│                                     # ReservationService, FineService, RefreshTokenService, JwtService
+├── repository/                       # 7 Spring Data JPA Repositories
+├── model/                            # 7 JPA Entities (Book, Member, BorrowRecord, User,
+│                                     # RefreshToken, BookReservation, FineRecord)
+├── dto/                              # Request & Response DTOs
+├── exception/                        # Custom Exceptions & GlobalExceptionHandler
+└── worker/                           # OverdueReconciliationWorker (@Scheduled cron)
+```
 
 ---
 
-# Learning Rules
+## 📑 5. Key Documentation Links
 
-* Never copy code without understanding it.
-* Learn one concept before moving to the next.
-* Always ask "Why?" before "How?"
-* Build first, then optimize.
-* Every feature should teach a Spring Boot concept.
-
----
-
-# Coding Rules
-
-* Controller only handles HTTP requests.
-* Service contains business logic.
-* Repository only accesses the database.
-* Keep methods small and readable.
-* Follow Single Responsibility Principle.
-
----
-
-# Milestones
-
-## Phase 1 (Current)
-
-Learn Spring Boot Fundamentals.
-
-Status:
-
-🟢 In Progress
-
----
-
-## Phase 2
-
-Professional Backend Architecture.
-
-Status:
-
-⚪ Not Started
-
----
-
-## Phase 3
-
-Authentication & Security.
-
-Status:
-
-⚪ Not Started
-
----
-
-## Phase 4
-
-Production Ready Backend.
-
-Status:
-
-⚪ Not Started
-
----
-
-# Long-Term Goal
-
-Build a backend project that demonstrates professional Spring Boot development and provides a strong portfolio project for internships and software engineering interviews.
+- 📘 [PROJECT_SUMMARY.md](file:///D:/library/library/PROJECT_SUMMARY.md) — Comprehensive technical overview.
+- 🧠 [PROJECT_BRAIN.md](file:///D:/library/library/PROJECT_BRAIN.md) — Authoritative transformation ledger & milestones.
+- 🔌 [API_DOCUMENTATION.md](file:///D:/library/library/API_DOCUMENTATION.md) — Complete REST API reference.
+- 🗄️ [DATABASE_SCHEMA.md](file:///D:/library/library/DATABASE_SCHEMA.md) — Relational schema & composite indexes.

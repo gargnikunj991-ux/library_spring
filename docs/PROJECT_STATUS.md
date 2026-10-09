@@ -1,14 +1,14 @@
-# 📊 Project Status & Retrospective
+# 📊 Project Status & Retrospective -- LibroSphere
 
-> **Status**: ✅ **Complete / Stable (v1.0.0)**  
+> **Status**: ✅ **Complete / Stable (v1.1.0)**  
 > **Maintainer**: Nikunj Garg ([@gargnikunj991-ux](https://github.com/gargnikunj991-ux))  
-> **Last Updated**: August 2026
+> **Last Updated**: October 2026
 
 ---
 
 ## 🎯 Executive Summary
 
-The **Library Management System** backend has achieved all target engineering objectives for its initial **v1.0.0 production milestone**. The project is designed as an enterprise-grade reference architecture demonstrating clean backend layering, stateless JWT authentication, cryptographic refresh token rotation, transaction management, and relational data modeling with Spring Boot 4.1.0, Java 21, and PostgreSQL.
+The **Library Management System (LibroSphere)** backend has evolved into an enterprise-grade digital asset lending and waitlist reservation engine. The project demonstrates clean backend architecture, concurrency-safe inventory locking, automated FIFO waitlist queues, scheduled background fine reconciliation, composite B-Tree query optimizations, and containerized DevOps with Java 21, Spring Boot 4.1.0, and PostgreSQL 16.
 
 ---
 
@@ -16,58 +16,59 @@ The **Library Management System** backend has achieved all target engineering ob
 
 ### 1. Architectural Foundation & Data Layer
 - [x] Clean Layered Architecture (`Controller` → `Service` → `Repository` → `PostgreSQL`).
-- [x] Strict DTO decoupling; database entities are never exposed across HTTP boundaries.
-- [x] PostgreSQL relational schema with 5 core tables (`users`, `refresh_tokens`, `books`, `members`, `borrow_records`).
-- [x] Hibernate `@ManyToOne` foreign key mappings and automated schema synchronization (`ddl-auto=update`).
+- [x] Decoupled DTO contracts with strict validation; internal entities are never exposed across HTTP boundaries.
+- [x] PostgreSQL relational schema with 7 production tables (`users`, `refresh_tokens`, `books`, `members`, `borrow_records`, `book_reservations`, `fine_records`).
+- [x] Composite B-Tree database indexes for sub-millisecond query optimization.
+- [x] Automated schema synchronization (`ddl-auto=update`).
 
 ### 2. Authentication & Authorization Security
 - [x] Stateless Spring Security filter chain with `SessionCreationPolicy.STATELESS`.
 - [x] Custom `JwtAuthenticationFilter` with SLF4J logging and HMAC-SHA256 signature verification.
-- [x] Dynamic `@Value("${jwt.secret}")` configuration backed by `.env` loading.
-- [x] Refresh token rotation with persisted UUID tokens, expiration timestamps, and instant logout revocation (`POST /auth/logout`).
-- [x] Role-Based Access Control (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) guarding administrative deletions and modifications.
-- [x] Custom security error dispatching (`AuthenticationEntryPoint` -> `401 Unauthorized`, `AccessDeniedHandler` -> `403 Forbidden`).
+- [x] Dynamic environment configuration (`.env`) loaded via `dotenv-java`.
+- [x] Cryptographic refresh token rotation with persisted UUID tokens and instant revocation (`POST /auth/logout`).
+- [x] Role-Based Access Control (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) guarding sensitive actions.
+- [x] Automated initial `ADMIN` user seeder on startup via `DataInitializer` (`admin` / `admin123`).
+- [x] Standardized security error dispatching (`AuthenticationEntryPoint` -> `401 Unauthorized`, `AccessDeniedHandler` -> `403 Forbidden`).
 
-### 3. Business Modules
-- [x] **Book Management**: Full REST CRUD with validation and availability flags.
-- [x] **Member Registry**: Full REST CRUD with email validation.
-- [x] **Borrowing & Return State Engine**:
-  - Availability validation throwing `BookUnavailableException` if already checked out.
-  - Automated 14-day due date computation.
-  - `@Transactional` multi-table state updates on checkout and return.
+### 3. High-Concurrency Asset Lending & Inventory
+- [x] Multi-copy relational inventory tracking (`totalCopies`, `availableCopies`).
+- [x] Concurrency safety guaranteed via `@Lock(LockModeType.PESSIMISTIC_WRITE)` (`SELECT ... FOR UPDATE`), eliminating TOCTOU race conditions.
+- [x] Multi-threaded concurrency stress test (`BorrowConcurrencyIntegrationTest`) proving zero double-checkouts under high contention.
+- [x] Automated 14-day checkout duration calculation.
 
-### 4. Resiliency & Error Handling
-- [x] Centralized `@ControllerAdvice` handling custom domain exceptions and validation errors.
-- [x] Sanitized client responses with `server.error.include-stacktrace=never`.
+### 4. FIFO Waitlist & Reservation Engine
+- [x] `BookReservation` entity managing statuses: `WAITING`, `NOTIFIED_READY`, `CLAIMED`, `EXPIRED`, `CANCELLED`.
+- [x] FIFO priority dispatching ordered by `reservedAt ASC`.
+- [x] Return workflow auto-locks available copies exclusively for next waiting patrons with a 48-hour pickup window (`NOTIFIED_READY`) instead of releasing to public stock.
+- [x] Automatic reallocation on patron cancellation.
+
+### 5. Automated Tiered Overdue Fine Worker
+- [x] `FineRecord` entity tracking member liabilities and payment statuses.
+- [x] Tiered overdue penalty formula (₹1/day for days 1–5, ₹5/day for days 6–15, ₹10/day for day 16+).
+- [x] Background cron scheduler (`OverdueReconciliationWorker`) running nightly at midnight (`0 0 0 * * *`) via Spring `@Scheduled`.
+- [x] Idempotent liability calculation preventing duplicate charges across restarts.
+- [x] Granular RBAC supporting library-wide audits, member liability queries, and payments.
+
+### 6. Interactive OpenAPI & DevOps
+- [x] SpringDoc OpenAPI 3.0 / Swagger UI integrated at `/swagger-ui/index.html` with JWT Bearer authorization support.
+- [x] Multi-stage `Dockerfile` with Eclipse Temurin JRE 21.
+- [x] `docker-compose.yml` for multi-container orchestration with PostgreSQL 16 Alpine.
+- [x] GitHub Actions automated CI workflow (`.github/workflows/ci.yml`) executing all 66 tests on pushes and PRs.
 
 ---
 
 ## ⚠️ Known Limitations & Scope Boundaries
 
-While fully functional and feature-complete for its v1.0.0 design, the current iteration intentionally scoped out the following elements:
+While fully functional and robust, future iterations can address the following areas:
 
-1. **Pagination & Sorting**: Book and member listings currently return full result sets. For production catalogs with 100k+ records, Spring Data `Pageable` is recommended.
-2. **Automated Overdue Fine Calculation**: Overdue calculations are performed by querying records rather than an automated daily scheduled background cron job.
-3. **External Email Notifications**: Due date reminder notifications are currently surfaced via API queries rather than an asynchronous SMTP / Kafka email queue.
-4. **OpenAPI / Swagger UI**: Documentation is maintained via markdown specifications in `docs/` rather than dynamic Swagger annotations.
+1. **Pagination & Sorting**: Book and member listings return full lists. For catalogs with 100k+ records, Spring Data `Pageable` is recommended.
+2. **External Email / SMS Notifications**: Patrons currently query their reservation status or fines via REST APIs. In the future, this can be paired with an asynchronous notification bus (Spring ApplicationEvents / Kafka / JavaMailSender) to send emails when a book becomes ready for pickup.
+3. **Cloud Production Deployment**: Can be deployed live to managed cloud providers such as Railway or AWS ECS.
 
 ---
 
 ## 💡 Key Engineering Takeaways & Lessons Learned
 
-1. **DTO Separation Prevents Security Leaks**: Decoupling entities from API contracts prevents unwanted exposure of internal fields (e.g. password hashes or internal foreign key references).
-2. **Spring Security Filter Chain Precision**: Manually instantiating `JwtAuthenticationFilter` inside `SecurityFilterChain` prevents double registration issues often caused by combining `@Component` with `http.addFilterBefore()`.
-3. **Transaction Boundaries on Multi-Entity Mutations**: Annotating `BorrowService` methods with `@Transactional` guarantees atomicity, ensuring that if creating a `BorrowRecord` fails, the `Book` availability flag is rolled back automatically.
-4. **Secrets Management Hygiene**: Keeping secrets out of Git repositories via `.env.example` templates and `dotenv-java` enables reproducible setups across different deployment environments.
-
----
-
-## 🚀 Future Roadmap
-
-If development resumes for v2.0, the recommended feature roadmap includes:
-
-- [ ] **Pagination & Filtering**: Integrate `Pageable`, `Sort`, and Spring Data JPA Specifications for multi-criteria book searching.
-- [ ] **Docker Containerization**: Provide a single `docker-compose.yml` defining the Spring Boot backend and PostgreSQL database for one-command startup.
-- [ ] **Overdue Background Scheduler**: Implement `@Scheduled` cron jobs to check due dates and calculate overdue fines.
-- [ ] **OpenAPI 3.0 / Swagger UI**: Integrate `springdoc-openapi` for live interactive API documentation.
-- [ ] **CI/CD Pipeline**: Add GitHub Actions workflow for automated test execution on every pull request.
+1. **Pessimistic Locking Eliminates TOCTOU Races**: Applying database-level row locking (`SELECT ... FOR UPDATE`) guarantees serialization of checkout attempts at the database engine level, preventing inventory underflow when multiple threads contend for the last copy.
+2. **Reservation Invariants Prevent Inventory Leaks**: When returning a book, verifying the waitlist queue before incrementing `availableCopies` prevents the item from leaking to walk-in patrons while a reserved patron has priority.
+3. **Idempotent Background Jobs Guarantee Consistency**: Calculating liabilities deterministically from `dueDate` to current date ensures the nightly cron worker can restart or run repeatedly without generating double fines.

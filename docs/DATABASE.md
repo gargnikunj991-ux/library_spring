@@ -1,84 +1,200 @@
-# 🗄️ Database Architecture & Data Models
+# 🗄️ Database Schema & Data Models -- Library Management System
 
-This document details the database design, entity relationship diagrams (ERD), table structures, column definitions, constraints, relationships, and indexing strategies for the **Library Management System**.
-
----
-
-## 🛠️ Database Technology Stack
-
-- **RDBMS Engine**: PostgreSQL 16+
-- **JPA Provider / ORM**: Hibernate ORM 6.x / Spring Data JPA
-- **Database Driver**: `org.postgresql.Driver`
-- **Dialect**: `org.hibernate.dialect.PostgreSQLDialect`
-- **Schema Strategy**: `spring.jpa.hibernate.ddl-auto=update` (Automated schema synchronization)
-- **Transaction Management**: Spring Framework declarative `@Transactional` boundaries
+This document describes the PostgreSQL database schema, JPA entity mapping, table definitions, data types, primary keys, and table relationships.
 
 ---
 
 ## 📊 Entity Relationship Diagram (ERD)
 
-### Mermaid Diagram
-```mermaid
-erDiagram
-    USERS ||--o{ REFRESH_TOKENS : "has many"
-    BOOKS ||--o{ BORROW_RECORDS : "referenced in"
-    MEMBERS ||--o{ BORROW_RECORDS : "borrows via"
-
-    USERS {
-        bigint id PK
-        varchar username UK "NOT NULL"
-        varchar password "NOT NULL"
-        varchar role "NOT NULL"
-    }
-
-    REFRESH_TOKENS {
-        bigint id PK
-        varchar token UK "NOT NULL"
-        timestamp_with_time_zone expiry_date "NOT NULL"
-        bigint user_id FK "NOT NULL"
-        boolean revoked "NOT NULL"
-    }
-
-    BOOKS {
-        bigint id PK
-        varchar title "NULLABLE"
-        varchar author "NULLABLE"
-        boolean available "NOT NULL"
-    }
-
-    MEMBERS {
-        bigint member_id PK
-        varchar name "NULLABLE"
-        varchar email "NULLABLE"
-        varchar phone_number "NULLABLE"
-    }
-
-    BORROW_RECORDS {
-        bigint borrow_id PK
-        bigint book_id FK "NOT NULL"
-        bigint member_id FK "NOT NULL"
-        date borrow_date "NOT NULL"
-        date due_date "NOT NULL"
-        date return_date "NULLABLE"
-        boolean returned "NOT NULL"
-    }
+```
+┌─────────────────────────┐             ┌─────────────────────────┐             ┌─────────────────────────┐
+│          books          │             │         members         │             │          users          │
+├─────────────────────────┤             ├─────────────────────────┤             ├─────────────────────────┤
+│ PK  id                  │             │ PK  member_id           │             │ PK  id                  │
+│     title               │             │     name                │             │     username (unique)   │
+│     author              │             │     email               │             │     password            │
+│     total_copies        │             │     phone_number        │             │     role                │
+│     available_copies    │             └────────────┬────────────┘             └────────────┬────────────┘
+└───────┬─────────┬───────┘                          │                                       │
+        │         │                                  │                                       │
+        │ 1       │ 1                                │ 1                                     │ 1
+        │         │                                  │                                       │
+        │ N       │ N                                │ N                                     │ N
+        │         │         ┌────────────────────────┴────────────┐             ┌────────────┴────────────┐
+        │         │         │                         borrow_records      │             │     refresh_tokens      │
+        │         │         ├─────────────────────────────────────┤             ├─────────────────────────┤
+        │         │         │ PK  borrow_id                       │             │ PK  id                  │
+        │         └─────────┼►FK  book_id ──► books(id)           │             │ FK  user_id ──►users(id)│
+        │                   │ FK  member_id                       │             │     token (unique)      │
+        │                   │     borrow_date                     │             │     expiry_date         │
+        │                   │     due_date                        │             │     revoked             │
+        │                   │     return_date                     │             └─────────────────────────┘
+        │                   │     returned                        │
+        │                   └──────────────┬──────────────────────┘
+        │                                  │
+        │                                  │ 1
+        │                                  │
+        │                                  │ N
+        │                                  ▼
+        │                   ┌─────────────────────────────────────┐
+        │                   │             fine_records            │
+        │                   ├─────────────────────────────────────┤
+        │                   │ PK  fine_id                         │
+        │                   │ FK  borrow_id ──► borrow_records    │
+        │                   │ FK  member_id ──► members(member_id)│
+        │                   │     amount                          │
+        │                   │     paid                            │
+        │                   │     calculated_at                   │
+        │                   │     paid_at                         │
+        │                   └─────────────────────────────────────┘
+        │
+        │ N
+┌───────┴─────────────────────────────────────────────────────────┐
+│                        book_reservations                        │
+├─────────────────────────────────────────────────────────────────┤
+│ PK  id                                                          │
+│ FK  book_id    ──────────────► books(id)                        │
+│ FK  member_id  ──────────────► members(member_id)               │
+│     status     ──────────────► WAITING / NOTIFIED_READY / ...   │
+│     reserved_at                                                 │
+│     pickup_deadline                                             │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🗃️ Relational Table Specifications
+## 🗃️ Table Specifications
 
-### 1. `users` Table
-Stores authentication credentials, user roles, and security details for system operators (Administrators, Librarians, Assistants).
+### 1. `books` Table
 
-| Column Name | SQL Type | JPA Mapping | Constraints | Description |
+Mapped to Entity: `com.nikunj.library.model.Book`
+
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
 |---|---|---|---|---|
-| `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | `PRIMARY KEY`, Auto-Increment | Unique user identifier |
-| `username` | `VARCHAR(255)` | `@Column(nullable = false, unique = true)` | `NOT NULL`, `UNIQUE` | User login username |
-| `password` | `VARCHAR(255)` | `@Column(nullable = false)` | `NOT NULL` | BCrypt-hashed password string |
-| `role` | `VARCHAR(255)` | `@Enumerated(EnumType.STRING) @Column(nullable = false)` | `NOT NULL` | User role (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) |
+| `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for each book |
+| `title` | `VARCHAR(255)` | Field: `title` | NOT NULL | Title of the book |
+| `author` | `VARCHAR(255)` | Field: `author` | NOT NULL | Author name |
+| `total_copies` | `INTEGER` | Field: `totalCopies` | NOT NULL, Default `1` | Total physical/digital inventory copies |
+| `available_copies` | `INTEGER` | Field: `availableCopies` | NOT NULL, Default `1` | Number of currently available copies |
 
-#### JPA Entity Reference (`User.java`)
+**JPA Mapping (`Book.java`)**:
+```java
+@Entity
+@Table(name = "books", indexes = {
+    @Index(name = "idx_books_title_author", columnList = "title, author"),
+    @Index(name = "idx_books_author", columnList = "author")
+})
+public class Book {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
+    @Column(nullable = false)
+    private String title;
+
+    @Column(nullable = false)
+    private String author;
+
+    @Column(name = "total_copies", nullable = false)
+    private int totalCopies = 1;
+
+    @Column(name = "available_copies", nullable = false)
+    private int availableCopies = 1;
+}
+```
+
+---
+
+### 2. `members` Table
+
+Mapped to Entity: `com.nikunj.library.model.Member`
+
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
+|---|---|---|---|---|
+| `member_id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for each member |
+| `name` | `VARCHAR(255)` | Field: `name` | Nullable | Full name of the member |
+| `email` | `VARCHAR(255)` | Field: `email` | Nullable | Email address of the member |
+| `phone_number` | `VARCHAR(255)` | Field: `phoneNumber` | Nullable | Contact phone number |
+
+**JPA Mapping (`Member.java`)**:
+```java
+@Entity
+@Table(name = "members")
+public class Member {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long memberId;
+    private String name;
+    private String email;
+    private String phoneNumber;
+}
+```
+
+---
+
+### 3. `borrow_records` Table
+
+Mapped to Entity: `com.nikunj.library.model.BorrowRecord`
+
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
+|---|---|---|---|---|
+| `borrow_id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for each borrow record |
+| `book_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "book_id")` | Foreign Key -> `books(id)` | References the borrowed book |
+| `member_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "member_id")` | Foreign Key -> `members(member_id)` | References the borrowing member |
+| `borrow_date` | `DATE` | Field: `borrowDate` | `LocalDate` | Date when the book was borrowed |
+| `due_date` | `DATE` | Field: `dueDate` | `LocalDate` | Date when book is due to be returned (default: +14 days) |
+| `return_date` | `DATE` | Field: `returnDate` | `LocalDate` (Nullable) | Actual date when book was returned |
+| `returned` | `BOOLEAN` | Field: `returned` | NOT NULL | `false` when active, `true` when returned |
+
+**JPA Mapping (`BorrowRecord.java`)**:
+```java
+@Entity
+@Table(name = "borrow_records", indexes = {
+    @Index(name = "idx_borrow_returned_due_date", columnList = "returned, due_date"),
+    @Index(name = "idx_borrow_member_id", columnList = "member_id"),
+    @Index(name = "idx_borrow_book_id", columnList = "book_id")
+})
+public class BorrowRecord {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long borrowId;
+
+    @ManyToOne
+    @JoinColumn(name = "book_id")
+    private Book book;
+
+    @ManyToOne
+    @JoinColumn(name = "member_id")
+    private Member member;
+
+    @Column(name = "borrow_date")
+    private LocalDate borrowDate;
+
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
+    @Column(name = "return_date")
+    private LocalDate returnDate;
+
+    @Column(nullable = false)
+    private boolean returned;
+}
+```
+
+---
+
+### 4. `users` Table
+
+Mapped to Entity: `com.nikunj.library.model.User`
+
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
+|---|---|---|---|---|
+| `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique user identifier |
+| `username` | `VARCHAR(255)` | `@Column(nullable = false, unique = true)` | UNIQUE, NOT NULL | User login username |
+| `password` | `VARCHAR(255)` | `@Column(nullable = false)` | NOT NULL | Hashed / User password |
+| `role` | `VARCHAR(255)` | `@Enumerated(EnumType.STRING) @Column(nullable = false)` | NOT NULL | User Role (`ADMIN`, `LIBRARIAN`, `ASSISTANT`) |
+
+**JPA Mapping (`User.java`)**:
 ```java
 @Entity
 @Table(name = "users")
@@ -96,23 +212,35 @@ public class User implements UserDetails {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
+
+    public enum Role {
+        ADMIN,
+        LIBRARIAN,
+        ASSISTANT
+    }
+
+    public Long getId() { return id; }
+    public void setUsername(String username) { this.username = username; }
+    public void setPassword(String password) { this.password = password; }
+    public void setRole(Role role) { this.role = role; }
 }
 ```
 
 ---
 
-### 2. `refresh_tokens` Table
-Manages persisted refresh tokens for seamless JWT renewal, session management, and revocation tracking.
+### 5. `refresh_tokens` Table
 
-| Column Name | SQL Type | JPA Mapping | Constraints | Description |
+Mapped to Entity: `com.nikunj.library.model.RefreshToken`
+
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
 |---|---|---|---|---|
-| `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | `PRIMARY KEY`, Auto-Increment | Unique record identifier |
-| `token` | `VARCHAR(255)` | `@Column(nullable = false, unique = true)` | `NOT NULL`, `UNIQUE` | Cryptographically secure UUID string |
-| `expiry_date` | `TIMESTAMP WITH TIME ZONE` | `@Column(nullable = false)` | `NOT NULL` | UTC timestamp of token expiration |
-| `user_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "user_id", nullable = false)` | `FOREIGN KEY -> users(id)` | References the token owner |
-| `revoked` | `BOOLEAN` | `private boolean revoked;` | `NOT NULL` | `true` if revoked via logout; else `false` |
+| `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for the refresh token record |
+| `token` | `VARCHAR(255)` | `@Column(nullable = false, unique = true)` | UNIQUE, NOT NULL | Refresh token string |
+| `expiry_date` | `TIMESTAMP WITH TIME ZONE` | `@Column(nullable = false)` | NOT NULL | Expiration timestamp (`Instant`) |
+| `user_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "user_id", nullable = false)` | Foreign Key -> `users(id)` | Associated user entity reference |
+| `revoked` | `BOOLEAN` | Field: `revoked` | NOT NULL | Flag indicating if token is revoked |
 
-#### JPA Entity Reference (`RefreshToken.java`)
+**JPA Mapping (`RefreshToken.java`)**:
 ```java
 @Entity
 @Table(name = "refresh_tokens")
@@ -137,117 +265,128 @@ public class RefreshToken {
 
 ---
 
-### 3. `books` Table
-Maintains the inventory of library books and real-time checkout availability status.
+### 6. `book_reservations` Table
 
-| Column Name | SQL Type | JPA Mapping | Constraints | Description |
+Mapped to Entity: `com.nikunj.library.model.BookReservation`
+
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
 |---|---|---|---|---|
-| `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | `PRIMARY KEY`, Auto-Increment | Unique book identifier |
-| `title` | `VARCHAR(255)` | `private String title;` | Nullable | Title of the book |
-| `author` | `VARCHAR(255)` | `private String author;` | Nullable | Name of the author |
-| `available` | `BOOLEAN` | `private boolean available;` | `NOT NULL` | `true` if in stock, `false` if checked out |
+| `id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for the reservation |
+| `book_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "book_id", nullable = false)` | Foreign Key -> `books(id)` | References the reserved book |
+| `member_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "member_id", nullable = false)` | Foreign Key -> `members(member_id)` | References the reserving member |
+| `status` | `VARCHAR(255)` | `@Enumerated(EnumType.STRING) @Column(nullable = false)` | NOT NULL | `WAITING`, `NOTIFIED_READY`, `CLAIMED`, `EXPIRED`, `CANCELLED` |
+| `reserved_at` | `TIMESTAMP` | `@Column(name = "reserved_at", nullable = false)` | NOT NULL | Date & time when reservation was placed (FIFO priority) |
+| `pickup_deadline` | `TIMESTAMP` | `@Column(name = "pickup_deadline")` | Nullable | 48-hour deadline once asset is ready for pickup |
 
-#### JPA Entity Reference (`Book.java`)
+**JPA Mapping (`BookReservation.java`)**:
 ```java
 @Entity
-@Table(name = "books")
-public class Book {
+@Table(name = "book_reservations", indexes = {
+    @Index(name = "idx_reservation_book_status_fifo", columnList = "book_id, status, reserved_at"),
+    @Index(name = "idx_reservation_member_status", columnList = "member_id, status"),
+    @Index(name = "idx_reservation_status_deadline", columnList = "status, pickup_deadline")
+})
+public class BookReservation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String title;
-    private String author;
-    private boolean available;
-}
-```
 
----
-
-### 4. `members` Table
-Stores contact information and profile records for registered library members.
-
-| Column Name | SQL Type | JPA Mapping | Constraints | Description |
-|---|---|---|---|---|
-| `member_id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | `PRIMARY KEY`, Auto-Increment | Unique member identifier |
-| `name` | `VARCHAR(255)` | `private String name;` | Nullable | Full name of the member |
-| `email` | `VARCHAR(255)` | `private String email;` | Nullable | Email address |
-| `phone_number` | `VARCHAR(255)` | `private String phoneNumber;` | Nullable | Contact telephone number |
-
-#### JPA Entity Reference (`Member.java`)
-```java
-@Entity
-@Table(name = "members")
-public class Member {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long memberId;
-    private String name;
-    private String email;
-    private String phoneNumber;
-}
-```
-
----
-
-### 5. `borrow_records` Table
-Tracks active and historical borrowing transactions between members and books.
-
-| Column Name | SQL Type | JPA Mapping | Constraints | Description |
-|---|---|---|---|---|
-| `borrow_id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | `PRIMARY KEY`, Auto-Increment | Unique transaction identifier |
-| `book_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "book_id")` | `FOREIGN KEY -> books(id)` | Foreign key referencing borrowed book |
-| `member_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "member_id")` | `FOREIGN KEY -> members(member_id)` | Foreign key referencing borrower |
-| `borrow_date` | `DATE` | `private LocalDate borrowDate;` | `NOT NULL` | Date when checkout occurred |
-| `due_date` | `DATE` | `private LocalDate dueDate;` | `NOT NULL` | Date by which book must be returned (+14 days) |
-| `return_date` | `DATE` | `private LocalDate returnDate;` | Nullable | Date when book was physically returned |
-| `returned` | `BOOLEAN` | `private boolean returned;` | `NOT NULL` | `false` if active, `true` once completed |
-
-#### JPA Entity Reference (`BorrowRecord.java`)
-```java
-@Entity
-@Table(name = "borrow_records")
-public class BorrowRecord {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long borrowId;
-
-    @ManyToOne
-    @JoinColumn(name = "book_id")
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "book_id", nullable = false)
     private Book book;
 
-    @ManyToOne
-    @JoinColumn(name = "member_id")
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
-    private LocalDate borrowDate;
-    private LocalDate dueDate;
-    private LocalDate returnDate;
-    private boolean returned;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private ReservationStatus status = ReservationStatus.WAITING;
+
+    @Column(name = "reserved_at", nullable = false)
+    private LocalDateTime reservedAt = LocalDateTime.now();
+
+    @Column(name = "pickup_deadline")
+    private LocalDateTime pickupDeadline;
 }
 ```
 
 ---
 
-## 🔗 Table Relationships Explained
+### 7. `fine_records` Table
 
-1. **`users` 1 ── N `refresh_tokens`**:
-   - A single user can possess multiple refresh tokens across sessions or devices.
-   - Associated via `user_id` foreign key.
+Mapped to Entity: `com.nikunj.library.model.FineRecord`
 
-2. **`books` 1 ── N `borrow_records`**:
-   - A book can have multiple historical borrowing records over its lifetime.
-   - Associated via `book_id` foreign key.
+| Column Name | Data Type | JPA Annotation | Constraints | Description |
+|---|---|---|---|---|
+| `fine_id` | `BIGINT` | `@Id @GeneratedValue(strategy = IDENTITY)` | Primary Key, Auto-increment | Unique identifier for the fine record |
+| `borrow_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "borrow_id", nullable = false)` | Foreign Key -> `borrow_records(borrow_id)` | References the overdue loan |
+| `member_id` | `BIGINT` | `@ManyToOne @JoinColumn(name = "member_id", nullable = false)` | Foreign Key -> `members(member_id)` | References the liable member |
+| `amount` | `NUMERIC(10,2)` | `@Column(nullable = false, precision = 10, scale = 2)` | NOT NULL | Accrued fine amount in INR |
+| `paid` | `BOOLEAN` | Field: `paid` | NOT NULL, Default `false` | Settlement status flag |
+| `calculated_at` | `TIMESTAMP` | `@Column(name = "calculated_at", nullable = false)` | NOT NULL | Timestamp when fine was last reconciled |
+| `paid_at` | `TIMESTAMP` | `@Column(name = "paid_at")` | Nullable | Timestamp when fine was settled |
 
-3. **`members` 1 ── N `borrow_records`**:
-   - A member can borrow multiple books across different transactions.
-   - Associated via `member_id` foreign key.
+**JPA Mapping (`FineRecord.java`)**:
+```java
+@Entity
+@Table(name = "fine_records", indexes = {
+    @Index(name = "idx_fines_member_paid", columnList = "member_id, paid"),
+    @Index(name = "idx_fines_borrow_paid", columnList = "borrow_id, paid"),
+    @Index(name = "idx_fines_paid", columnList = "paid")
+})
+public class FineRecord {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long fineId;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "borrow_id", nullable = false)
+    private BorrowRecord borrowRecord;
+
+    @ManyToOne(optional = false)
+    @JoinColumn(name = "member_id", nullable = false)
+    private Member member;
+
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal amount = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private boolean paid = false;
+
+    @Column(name = "calculated_at", nullable = false)
+    private LocalDateTime calculatedAt = LocalDateTime.now();
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
+}
+```
 
 ---
 
-## ⚡ Indexing & Performance Considerations
+## ⚡ 8. Database Indexes & Query Optimization (Phase 6)
 
-- **Primary Keys**: Auto-indexed with B-tree indices in PostgreSQL (`id`, `member_id`, `borrow_id`).
-- **Unique Constraints**:
-  - `users(username)` is backed by a unique B-tree index for fast $O(\log n)$ user lookups during authentication.
-  - `refresh_tokens(token)` is backed by a unique B-tree index for fast token verification and rotation lookups.
-- **Foreign Key Columns**: Foreign key columns (`book_id`, `member_id`, `user_id`) benefit from indexing in high-throughput environments to accelerate join queries.
+To prevent Sequential Scans ($O(N)$ operations) on large catalog and loan volumes, composite and single-column B-Tree indexes are defined across high-traffic query paths:
+
+| Table | Index Name | Indexed Columns | Query Pattern / Target Operations |
+|---|---|---|---|
+| `books` | `idx_books_title_author` | `(title, author)` | Multi-column catalog search & ordering (`LOWER(title) LIKE ... OR LOWER(author) LIKE ...`) |
+| `books` | `idx_books_author` | `(author)` | Direct author filtering |
+| `borrow_records` | `idx_borrow_returned_due_date` | `(returned, due_date)` | Nightly overdue reconciliation worker (`findByReturnedFalseAndDueDateBefore`) |
+| `borrow_records` | `idx_borrow_member_id` | `(member_id)` | Member loan history lookups |
+| `borrow_records` | `idx_borrow_book_id` | `(book_id)` | Book circulation history |
+| `book_reservations` | `idx_reservation_book_status_fifo` | `(book_id, status, reserved_at)` | FIFO waitlist dispatching on return (`findFirstByBookIdAndStatusOrderByReservedAtAsc`) |
+| `book_reservations` | `idx_reservation_member_status` | `(member_id, status)` | Patron reservation checks & duplicate waitlist prevention |
+| `book_reservations` | `idx_reservation_status_deadline` | `(status, pickup_deadline)` | 48-hour pickup expiration worker queries |
+| `fine_records` | `idx_fines_member_paid` | `(member_id, paid)` | Patron unpaid liability inquiries (`findByMemberMemberIdAndPaidFalse`) |
+| `fine_records` | `idx_fines_borrow_paid` | `(borrow_id, paid)` | Idempotent fine check during reconciliation (`findByBorrowRecordBorrowIdAndPaidFalse`) |
+| `fine_records` | `idx_fines_paid` | `(paid)` | Library-wide outstanding fine audits (`findByPaidFalse`) |
+
+---
+
+## ⚙️ JPA Configuration Notes (`application.properties`)
+
+- `spring.jpa.hibernate.ddl-auto=update`: Hibernate automatically synchronizes Java entity definitions with PostgreSQL database tables, including DDL index creation.
+- `spring.jpa.database-platform=org.hibernate.dialect.PostgreSQLDialect`: Configures Hibernate dialect for PostgreSQL compatibility.
+
+

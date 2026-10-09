@@ -200,7 +200,7 @@ The goal is to master Spring Boot concepts ground-up:
 | **Commit 4** | `perf(db): add composite B-Tree indexes on book catalog and database query optimization` | ✅ Completed (64 tests passing) | DONE |
 | **Security & Bootstrap** | `feat(auth): add automated admin seeder DataInitializer, fix /api/members RBAC route, and sanitize .env.example` | ✅ Completed (66 tests passing) | DONE |
 | **Commit 5** | `ci(devops): add multi-stage Dockerfile, docker-compose, and GitHub Actions workflow` | ✅ Completed (Dockerfile, docker-compose.yml, .dockerignore, .github/workflows/ci.yml) | DONE |
-| **Commit 6** | `docs(portfolio): finalize LibroSphere architecture docs and live Railway deployment` | • Deploy backend live to Railway (live Swagger UI)<br>• Synchronize all project markdown files (`README.md`, `API_DOCUMENTATION.md`) | ~20 min |
+| **Commit 6** | `docs(portfolio): finalize LibroSphere architecture docs and live Railway deployment` | • Synchronized all project markdown files (`README.md`, `API_DOCUMENTATION.md`, `DATABASE_SCHEMA.md`, `PROJECT_SUMMARY.md`, `BRAIN.md`, `CHANGELOG.md`, `docs/*`) ✅ Completed<br>• Deploy backend live to Railway (live Swagger UI) | ~10 min |
 
 
 ---

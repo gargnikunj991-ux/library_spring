@@ -1,216 +1,132 @@
-# 🔌 REST API Reference & Specification
+# 🔌 API Documentation -- Library Management System
 
-This document provides complete, production-grade documentation for every RESTful API endpoint exposed by the **Library Management System**.
-
----
-
-## 🔒 Authentication & Headers Specification
-
-Except for public endpoints (`/auth/login` and `/auth/refresh`), all API requests require a valid JWT Access Token passed in the HTTP `Authorization` header:
-
-```http
-Authorization: Bearer <YOUR_JWT_ACCESS_TOKEN>
-Content-Type: application/json
-```
-
-### Role Matrix Summary
-| Endpoint | Method | Permitted Roles | Notes |
-|---|---|---|---|
-| `/auth/login` | `POST` | `permitAll` (Public) | Authenticates credentials |
-| `/auth/register` | `POST` | `ADMIN` | Registers system operators |
-| `/auth/refresh` | `POST` | `permitAll` (Public) | Issues fresh access token |
-| `/auth/logout` | `POST` | `ADMIN`, `LIBRARIAN`, `ASSISTANT` | Revokes active refresh token |
-| `/api/books` | `GET` | `ADMIN`, `LIBRARIAN`, `ASSISTANT` | List all inventory |
-| `/api/books/{id}` | `GET` | `ADMIN`, `LIBRARIAN`, `ASSISTANT` | Get book details |
-| `/api/books` | `POST` | `ADMIN`, `LIBRARIAN`, `ASSISTANT` | Add new book |
-| `/api/books/{id}` | `PUT` | `ADMIN`, `LIBRARIAN` | Update book |
-| `/api/books/{id}` | `DELETE` | `ADMIN` | Delete book |
-| `/api/members` | `GET` | `ADMIN`, `LIBRARIAN`, `ASSISTANT` | List all members |
-| `/api/members/{memberId}` | `GET` | `ADMIN`, `LIBRARIAN`, `ASSISTANT` | Get member details |
-| `/api/members` | `POST` | `ADMIN`, `LIBRARIAN`, `ASSISTANT` | Add new member |
-| `/api/members/{memberId}` | `PUT` | `ADMIN`, `LIBRARIAN` | Update member |
-| `/api/members/{memberId}` | `DELETE` | `ADMIN` | Delete member |
-| `/api/borrow` | `POST` | `ADMIN`, `LIBRARIAN`, `ASSISTANT` | Checkout a book |
-| `/api/borrow/return/{borrowId}` | `POST` | `ADMIN`, `LIBRARIAN`, `ASSISTANT` | Return a checked out book |
+This document outlines all RESTful API endpoints, request payloads, response formats, validation rules, and error handling behaviors in the Library Management System backend.
 
 ---
 
-## 🔑 1. Authentication Endpoints (`/auth`)
+## 📖 Interactive Swagger 3.0 / OpenAPI Documentation
 
-### 1.1 User Login
-- **URL**: `/auth/login`
-- **Method**: `POST`
-- **Authentication**: None (`permitAll`)
-- **Purpose**: Authenticates user credentials and returns a JWT access token and refresh token.
+When the application is running locally, interactive API documentation with built-in JWT authorization is available at:
+- **Swagger UI**: [`http://localhost:8080/swagger-ui/index.html`](http://localhost:8080/swagger-ui/index.html)
+- **OpenAPI JSON Spec**: [`http://localhost:8080/v3/api-docs`](http://localhost:8080/v3/api-docs)
 
-#### Request Headers
-```http
-Content-Type: application/json
-```
+> **Testing via Swagger UI**: Click the **Authorize** button on top of the Swagger UI page, paste your Bearer JWT Token obtained from `/auth/login`, and execute all protected endpoints directly from your browser!
 
-#### Request Body (`LoginRequest`)
+---
+
+## 🔒 Security & Authentication
+
+Spring Security (`SecurityConfig.java`) is enabled across all API endpoints:
+- **CSRF**: Disabled (`csrf.disable()`)
+- **Public Endpoints**: `/auth/login`, `/auth/refresh`, `/v3/api-docs/**`, `/swagger-ui/**`, `/swagger-ui.html`
+- **Authentication**: Required (`.anyRequest().authenticated()`) for protected endpoints.
+- **Authorization**: Credentials must be supplied via HTTP Authentication for protected endpoints.
+
+### 🔑 Authentication Endpoints (`/auth`)
+
+Base Path: `/auth`
+
+#### 🔹 0.1 Register User
+- **HTTP Method**: `POST`
+- **Path**: `/auth/register`
+- **Description**: Registers a new user account with BCrypt password encoding.
+- **Request Body**: `RegisterRequest` (JSON)
 ```json
 {
-  "username": "admin",
-  "password": "AdminPassword123!"
+  "username": "johndoe",
+  "password": "secretpassword",
+  "role": "ADMIN"
 }
 ```
+- **Validation Rules**:
+  - `username`: `@NotBlank(message = "Username is mandatory")`
+  - `password`: `@NotBlank(message = "Password is mandatory")`
+  - `role`: `@NotNull(message = "Role is mandatory")` (Roles: `ADMIN`, `LIBRARIAN`, `ASSISTANT`)
+- **Response**: `200 OK` ("User registered successfully")
 
-#### Success Response (`200 OK`)
+#### 🔹 0.2 User Login
+- **HTTP Method**: `POST`
+- **Path**: `/auth/login`
+- **Description**: Authenticates user credentials and returns a signed JWT access token and a refresh token.
+- **Request Body**: `LoginRequest` (JSON)
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTcyMzQ1MDAwMCwiZXhwIjoxNzIzNDU4NjAwfQ...",
-  "refreshToken": "e3a89f92-5d41-477a-b9c1-456789abcdef",
+  "username": "johndoe",
+  "password": "secretpassword"
+}
+```
+- **Response**: `200 OK`
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "4a7e9b21-8c34-4d82-bcf2-9e1234567890",
   "tokenType": "Bearer"
 }
 ```
 
-#### Error Responses
-- **`400 Bad Request`** (Validation failure):
-  ```json
-  [
-    "Username is mandatory",
-    "Password is mandatory"
-  ]
-  ```
-- **`401 Unauthorized`** (Invalid credentials):
-  ```json
-  {
-    "error": "Unauthorized",
-    "message": "Bad credentials"
-  }
-  ```
-
----
-
-### 1.2 Register New User
-- **URL**: `/auth/register`
-- **Method**: `POST`
-- **Authentication**: Required (`ROLE_ADMIN`)
-- **Purpose**: Registers a new user account with BCrypt password hashing.
-
-#### Request Headers
-```http
-Authorization: Bearer <ADMIN_JWT_TOKEN>
-Content-Type: application/json
-```
-
-#### Request Body (`RegisterRequest`)
+#### 🔹 0.3 Refresh Access Token
+- **HTTP Method**: `POST`
+- **Path**: `/auth/refresh`
+- **Description**: Verifies a valid refresh token from PostgreSQL and issues a fresh JWT access token.
+- **Request Body**: `RefreshTokenRequest` (JSON)
 ```json
 {
-  "username": "librarian_john",
-  "password": "SecurePassword456!",
-  "role": "LIBRARIAN"
+  "refreshToken": "4a7e9b21-8c34-4d82-bcf2-9e1234567890"
 }
 ```
-*Allowed `role` values*: `ADMIN`, `LIBRARIAN`, `ASSISTANT`.
-
-#### Success Response (`200 OK`)
-```
-User registered successfully
-```
-
-#### Error Responses
-- **`400 Bad Request`** (Validation failure):
-  ```json
-  [
-    "Username is mandatory",
-    "Role is mandatory"
-  ]
-  ```
-- **`403 Forbidden`** (Insufficient role permissions):
-  ```json
-  {
-    "error": "Forbidden",
-    "message": "You do not have permission to access this resource"
-  }
-  ```
-
----
-
-### 1.3 Refresh Access Token
-- **URL**: `/auth/refresh`
-- **Method**: `POST`
-- **Authentication**: None (`permitAll`)
-- **Purpose**: Verifies an active refresh token in PostgreSQL and issues a fresh JWT access token.
-
-#### Request Headers
-```http
-Content-Type: application/json
-```
-
-#### Request Body (`RefreshTokenRequest`)
+- **Validation Rules**:
+  - `refreshToken`: `@NotBlank(message = "Refresh token is mandatory")`
+- **Response**:
+  - `200 OK`: Returns new `LoginResponse` containing renewed `accessToken` and `refreshToken`.
+  - `401 Unauthorized`: If refresh token is expired, revoked, or not found in database.
 ```json
 {
-  "refreshToken": "e3a89f92-5d41-477a-b9c1-456789abcdef"
-}
-```
-
-#### Success Response (`200 OK`)
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTcyMzQ2MDAwMCwiZXhwIjoxNzIzNDY4NjAwfQ...",
-  "refreshToken": "e3a89f92-5d41-477a-b9c1-456789abcdef",
+  "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+  "refreshToken": "4a7e9b21-8c34-4d82-bcf2-9e1234567890",
   "tokenType": "Bearer"
 }
 ```
 
-#### Error Responses
-- **`401 Unauthorized`** (Token expired or revoked):
-  ```
-  Failed for [e3a89f92-5d41-477a-b9c1-456789abcdef]: Refresh token was expired. Please make a new signin request
-  ```
+#### 🔹 0.4 User Logout & Token Revocation
+- **HTTP Method**: `POST`
+- **Path**: `/auth/logout`
+- **Description**: Invalidates and revokes the active refresh token (`revoked = true`) in the database for the authenticated user.
+- **Authorization**: Required (`Bearer <accessToken>`). Requires role: `ADMIN`, `LIBRARIAN`, or `ASSISTANT`.
+- **Request Body**: None
+- **Response**:
+  - `200 OK`: `"User logged out and refresh token revoked successfully"`
+  - `401 Unauthorized`: Missing or invalid JWT access token.
+  - `403 Forbidden`: Insufficient role permissions.
 
 ---
 
-### 1.4 User Logout
-- **URL**: `/auth/logout`
-- **Method**: `POST`
-- **Authentication**: Required (`ROLE_ADMIN`, `ROLE_LIBRARIAN`, `ROLE_ASSISTANT`)
-- **Purpose**: Revokes all active refresh tokens (`revoked = true`) in the database for the authenticated user.
+## 📚 1. Book API Endpoints (`/api/books`)
 
-#### Request Headers
-```http
-Authorization: Bearer <JWT_TOKEN>
-```
+Base Path: `/api/books`
 
-#### Success Response (`200 OK`)
-```
-User logged out and refresh token revoked successfully
-```
-
-#### Error Responses
-- **`401 Unauthorized`** (Missing or invalid token):
-  ```json
-  {
-    "error": "Unauthorized",
-    "message": "Full authentication is required to access this resource"
-  }
-  ```
-
----
-
-## 📚 2. Book Management Endpoints (`/api/books`)
-
-### 2.1 Get All Books
-- **URL**: `/api/books`
-- **Method**: `GET`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`, `ASSISTANT`)
-- **Purpose**: Retrieves all book inventory records.
-
-#### Success Response (`200 OK`)
+### 🔹 1.1 Get All Books
+- **HTTP Method**: `GET`
+- **Path**: `/api/books`
+- **Description**: Retrieves a list of all registered books.
+- **Request Body**: None
+- **Response**: `200 OK`
+- **Sample Response Body**:
 ```json
 [
   {
     "id": 1,
     "title": "Clean Code",
     "author": "Robert C. Martin",
+    "totalCopies": 5,
+    "availableCopies": 4,
     "available": true
   },
   {
     "id": 2,
-    "title": "Effective Java",
-    "author": "Joshua Bloch",
+    "title": "Spring Boot in Action",
+    "author": "Craig Walls",
+    "totalCopies": 2,
+    "availableCopies": 0,
     "available": false
   }
 ]
@@ -218,308 +134,458 @@ User logged out and refresh token revoked successfully
 
 ---
 
-### 2.2 Get Book by ID
-- **URL**: `/api/books/{id}`
-- **Method**: `GET`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`, `ASSISTANT`)
-- **Path Parameter**: `id` (`Long`) - Unique book ID
-
-#### Success Response (`200 OK`)
-```json
-{
-  "id": 1,
-  "title": "Clean Code",
-  "author": "Robert C. Martin",
-  "available": true
-}
-```
-
-#### Error Response (`404 Not Found`)
-```
-Book Not Found
-```
-
----
-
-### 2.3 Add New Book
-- **URL**: `/api/books`
-- **Method**: `POST`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`, `ASSISTANT`)
-- **Purpose**: Registers a new book into inventory.
-
-#### Request Body (`CreateBookRequest`)
-```json
-{
-  "title": "Design Patterns: Elements of Reusable Object-Oriented Software",
-  "author": "Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides",
-  "available": true
-}
-```
-
-#### Success Response (`200 OK`)
-```json
-{
-  "id": 3,
-  "title": "Design Patterns: Elements of Reusable Object-Oriented Software",
-  "author": "Erich Gamma, Richard Helm, Ralph Johnson, John Vlissides",
-  "available": true
-}
-```
-
-#### Error Response (`400 Bad Request`)
-```json
-[
-  "Title cannot be blank",
-  "Author cannot be blank"
-]
-```
-
----
-
-### 2.4 Update Book
-- **URL**: `/api/books/{id}`
-- **Method**: `PUT`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`)
-- **Path Parameter**: `id` (`Long`) - Unique book ID
-
-#### Request Body (`CreateBookRequest`)
-```json
-{
-  "title": "Clean Code: A Handbook of Agile Software Craftsmanship",
-  "author": "Robert C. Martin",
-  "available": true
-}
-```
-
-#### Success Response (`200 OK`)
-```json
-{
-  "id": 1,
-  "title": "Clean Code: A Handbook of Agile Software Craftsmanship",
-  "author": "Robert C. Martin",
-  "available": true
-}
-```
-
-#### Error Responses
-- **`404 Not Found`**: `Book Not Found`
-- **`403 Forbidden`**: Insufficient permissions (if called by `ASSISTANT`).
-
----
-
-### 2.5 Delete Book
-- **URL**: `/api/books/{id}`
-- **Method**: `DELETE`
-- **Authentication**: Required (`ROLE_ADMIN`)
-- **Path Parameter**: `id` (`Long`) - Unique book ID
-
-#### Success Response (`200 OK`)
-*(Empty Body)*
-
-#### Error Responses
-- **`404 Not Found`**: `Book Not Found`
-- **`403 Forbidden`**: `{"error": "Forbidden", "message": "You do not have permission to access this resource"}`
-
----
-
-## 👤 3. Member Management Endpoints (`/api/members`)
-
-### 3.1 Get All Members
-- **URL**: `/api/members`
-- **Method**: `GET`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`, `ASSISTANT`)
-
-#### Success Response (`200 OK`)
+### 🔹 1.2 Search Books (Query & Catalog Optimization)
+- **HTTP Method**: `GET`
+- **Path**: `/api/books/search`
+- **Query Parameter**: `query` (String, Optional) - Case-insensitive keyword matching book title or author. If empty or omitted, returns all books.
+- **Description**: Performs an optimized catalog lookup utilizing composite B-Tree indexes (`idx_books_title_author`).
+- **Response**: `200 OK`
+- **Sample Request**: `GET /api/books/search?query=design`
+- **Sample Response Body (`200 OK`)**:
 ```json
 [
   {
-    "memberId": 1,
-    "name": "Alice Johnson",
-    "email": "alice.johnson@example.com",
-    "phoneNumber": "+1-555-0143"
+    "id": 1,
+    "title": "Design Patterns",
+    "author": "Gang of Four",
+    "totalCopies": 5,
+    "availableCopies": 5,
+    "available": true
   }
 ]
 ```
 
 ---
 
-### 3.2 Get Member by ID
-- **URL**: `/api/members/{memberId}`
-- **Method**: `GET`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`, `ASSISTANT`)
-- **Path Parameter**: `memberId` (`Long`)
-
-#### Success Response (`200 OK`)
+### 🔹 1.3 Get Book by ID
+- **HTTP Method**: `GET`
+- **Path**: `/api/books/{id}`
+- **Description**: Retrieves a single book by its ID.
+- **Path Variable**: `id` (Long) - Book ID
+- **Response**:
+  - `200 OK` if found.
+  - `404 Not Found` if book ID does not exist (`"Book Not Found"`).
+- **Sample Response Body (`200 OK`)**:
 ```json
 {
-  "memberId": 1,
-  "name": "Alice Johnson",
-  "email": "alice.johnson@example.com",
-  "phoneNumber": "+1-555-0143"
+  "id": 1,
+  "title": "Clean Code",
+  "author": "Robert C. Martin",
+  "totalCopies": 5,
+  "availableCopies": 4,
+  "available": true
 }
-```
-
-#### Error Response (`404 Not Found`)
-```
-Member Not Found
 ```
 
 ---
 
-### 3.3 Add New Member
-- **URL**: `/api/members`
-- **Method**: `POST`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`, `ASSISTANT`)
-
-#### Request Body (`CreateMemberRequest`)
+### 🔹 1.4 Create New Book
+- **HTTP Method**: `POST`
+- **Path**: `/api/books`
+- **Description**: Registers a new book into inventory.
+- **Request Body**: `CreateBookRequest` (JSON)
 ```json
 {
-  "name": "Bob Williams",
-  "email": "bob.williams@example.com",
-  "phoneNumber": "+1-555-0189"
+  "title": "Effective Java",
+  "author": "Joshua Bloch",
+  "totalCopies": 3
+}
+```
+- **Validation Rules**:
+  - `title`: `@NotBlank` (Cannot be empty or null)
+  - `author`: `@NotBlank` (Cannot be empty or null)
+  - `totalCopies`: `@Min(1)` (Must be at least 1)
+- **Response**:
+  - `200 OK` with created `BookResponse`.
+  - `400 Bad Request` if validation fails (returns list of validation error messages).
+- **Sample Response Body (`200 OK`)**:
+```json
+{
+  "id": 3,
+  "title": "Effective Java",
+  "author": "Joshua Bloch",
+  "totalCopies": 3,
+  "availableCopies": 3,
+  "available": true
 }
 ```
 
-#### Success Response (`200 OK`)
+---
+
+### 🔹 1.5 Update Book
+- **HTTP Method**: `PUT`
+- **Path**: `/api/books/{id}`
+- **Description**: Updates an existing book by ID.
+- **Path Variable**: `id` (Long) - Book ID
+- **Request Body**: `CreateBookRequest` (JSON)
 ```json
 {
-  "memberId": 2,
-  "name": "Bob Williams",
-  "email": "bob.williams@example.com",
-  "phoneNumber": "+1-555-0189"
+  "title": "Effective Java (3rd Edition)",
+  "author": "Joshua Bloch",
+  "available": true
 }
 ```
+- **Response**:
+  - `200 OK` with updated `BookResponse`.
+  - `404 Not Found` if book ID does not exist (`"Book Not Found"`).
+  - `400 Bad Request` if validation fails.
 
-#### Error Response (`400 Bad Request`)
+---
+
+### 🔹 1.6 Delete Book
+- **HTTP Method**: `DELETE`
+- **Path**: `/api/books/{id}`
+- **Description**: Deletes a book by ID.
+- **Path Variable**: `id` (Long) - Book ID
+- **Response**:
+  - `200 OK` (empty response body).
+  - `404 Not Found` if book ID does not exist (`"Book Not Found"`).
+
+---
+
+## 👤 2. Member API Endpoints (`/api/members`)
+
+Base Path: `/api/members`
+
+### 🔹 2.1 Get All Members
+- **HTTP Method**: `GET`
+- **Path**: `/api/members`
+- **Description**: Retrieves a list of all library members.
+- **Response**: `200 OK`
+- **Sample Response Body**:
 ```json
 [
-  "Email must be a well-formed email address",
-  "Name cannot be blank"
+  {
+    "memberId": 1,
+    "name": "John Doe",
+    "email": "john.doe@example.com",
+    "phoneNumber": "1234567890"
+  }
 ]
 ```
 
 ---
 
-### 3.4 Update Member
-- **URL**: `/api/members/{memberId}`
-- **Method**: `PUT`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`)
-- **Path Parameter**: `memberId` (`Long`)
-
-#### Request Body (`CreateMemberRequest`)
-```json
-{
-  "name": "Bob Williams Jr.",
-  "email": "bob.jr@example.com",
-  "phoneNumber": "+1-555-0199"
-}
-```
-
-#### Success Response (`200 OK`)
-```json
-{
-  "memberId": 2,
-  "name": "Bob Williams Jr.",
-  "email": "bob.jr@example.com",
-  "phoneNumber": "+1-555-0199"
-}
-```
-
-#### Error Response (`404 Not Found`)
-```
-Member Not Found
-```
+### 🔹 2.2 Get Member by ID
+- **HTTP Method**: `GET`
+- **Path**: `/api/members/{memberId}`
+- **Description**: Retrieves a member by ID.
+- **Path Variable**: `memberId` (Long)
+- **Response**:
+  - `200 OK` if found.
+  - `404 Not Found` if member ID does not exist (`"Member Not Found"`).
 
 ---
 
-### 3.5 Delete Member
-- **URL**: `/api/members/{memberId}`
-- **Method**: `DELETE`
-- **Authentication**: Required (`ROLE_ADMIN`)
-- **Path Parameter**: `memberId` (`Long`)
-
-#### Success Response (`200 OK`)
-*(Empty Body)*
-
-#### Error Responses
-- **`404 Not Found`**: `Member Not Found`
-- **`403 Forbidden`**: Insufficient permissions.
+### 🔹 2.3 Add New Member
+- **HTTP Method**: `POST`
+- **Path**: `/api/members`
+- **Description**: Registers a new library member.
+- **Request Body**: `CreateMemberRequest` (JSON)
+```json
+{
+  "name": "Alice Smith",
+  "email": "alice.smith@example.com",
+  "phoneNumber": "+1-555-0199"
+}
+```
+- **Validation Rules**:
+  - `name`: `@NotBlank`
+  - `email`: `@NotBlank`, `@Email` (must be valid email format)
+  - `phoneNumber`: `@NotBlank`
+- **Response**:
+  - `200 OK` with created `MemberResponse`.
+  - `400 Bad Request` if validation fails.
 
 ---
 
-## 📖 4. Borrowing & Return Endpoints (`/api/borrow`)
+### 2.4 Update Member
+- **HTTP Method**: `PUT`
+- **Path**: `/api/members/{memberId}`
+- **Description**: Updates member details by ID.
+- **Path Variable**: `memberId` (Long)
+- **Request Body**: `CreateMemberRequest` (JSON)
+- **Response**:
+  - `200 OK` with updated `MemberResponse`.
+  - `404 Not Found` if member ID does not exist (`"Member Not Found"`).
+  - `400 Bad Request` if validation fails.
 
-### 4.1 Borrow a Book
-- **URL**: `/api/borrow`
-- **Method**: `POST`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`, `ASSISTANT`)
-- **Purpose**: Issues a book to a registered member, marks `available = false`, and schedules a 14-day return window.
+---
 
-#### Request Body (`CreateBorrowRequest`)
+### 🔹 2.5 Delete Member
+- **HTTP Method**: `DELETE`
+- **Path**: `/api/members/{memberId}`
+- **Description**: Deletes a member by ID.
+- **Path Variable**: `memberId` (Long)
+- **Response**:
+  - `200 OK` (empty response body).
+  - `404 Not Found` if member ID does not exist (`"Member Not Found"`).
+
+---
+
+## 📖 3. Borrow API Endpoints (`/api/borrow`)
+
+Base Path: `/api/borrow`
+
+### 🔹 3.1 Borrow a Book
+- **HTTP Method**: `POST`
+- **Path**: `/api/borrow`
+- **Description**: Borrows an available book for a registered member.
+- **Request Body**: `CreateBorrowRequest` (JSON)
 ```json
 {
   "bookId": 1,
   "memberId": 1
 }
 ```
-
-#### Success Response (`200 OK`)
+- **Validation Rules**:
+  - `bookId`: `@NotNull(message = "BookId is mandatory")`
+  - `memberId`: `@NotNull(message = "MemberId is mandatory")`
+- **Business Behavior**:
+  1. Finds `Member` by `memberId` (throws `MemberNotFoundException` if missing).
+  2. Finds `Book` by `bookId` (throws `BookNotFoundException` if missing).
+  3. Checks `book.isAvailable()`. If `false`, throws `BookUnavailableException`.
+  4. Sets `borrowDate` = today (`LocalDate.now()`).
+  5. Sets `dueDate` = today + 14 days (`LocalDate.now().plusDays(14)`).
+  6. Sets `returned` = `false`.
+  7. Sets `book.setAvailable(false)` and saves to database.
+  8. Saves `BorrowRecord`.
+- **Response**:
+  - `200 OK` returning `ResponseEntity<BorrowResponse>`.
+  - `404 Not Found` if member or book does not exist, or if book is unavailable.
+  - `400 Bad Request` if validation fails.
+- **Sample Response Body (`200 OK`)**:
 ```json
 {
-  "borrowId": 101,
+  "borrowId": 1,
   "bookId": 1,
-  "memberName": "Alice Johnson",
+  "memberName": "John Doe",
   "bookTitle": "Clean Code",
-  "borrowDate": "2026-08-12",
-  "dueDate": "2026-08-26",
+  "borrowDate": "2026-07-27",
+  "dueDate": "2026-08-10",
   "returned": false
 }
 ```
 
-#### Error Responses
-- **`404 Not Found`** (Book already checked out):
-  ```
-  Book Not available
-  ```
-- **`404 Not Found`** (Book or Member ID missing):
-  ```
-  Book Not Found
-  ```
-  *or*
-  ```
-  Member Not Found
-  ```
-- **`400 Bad Request`** (Missing required fields):
-  ```json
-  [
-    "BookId is mandatory",
-    "MemberId is mandatory"
-  ]
-  ```
-
 ---
 
-### 4.2 Return a Book
-- **URL**: `/api/borrow/return/{borrowId}`
-- **Method**: `POST`
-- **Authentication**: Required (`ADMIN`, `LIBRARIAN`, `ASSISTANT`)
-- **Path Parameter**: `borrowId` (`Long`) - Unique transaction record ID
-- **Purpose**: Marks transaction `returned = true`, stamps `returnDate = today`, and resets book `available = true`.
-
-#### Success Response (`200 OK`)
+### 🔹 3.2 Return a Book
+- **HTTP Method**: `POST`
+- **Path**: `/api/borrow/return/{borrowId}`
+- **Description**: Marks a borrowed book as returned. If active waitlist reservations exist for this book, the returned copy is automatically locked for the next patron in the FIFO queue with a 48-hour pickup window (`NOTIFIED_READY`); otherwise, the book's `availableCopies` is safely incremented.
+- **Path Variable**: `borrowId` (Long) - ID of the borrow record
+- **Business Behavior**:
+  1. Finds `BorrowRecord` by `borrowId` (throws `BorrowRecordNotFoundException` if missing).
+  2. If not already returned:
+     - Sets `returned` = `true`.
+     - Sets `returnDate` = today (`LocalDate.now()`).
+     - Acquires pessimistic lock on `Book`.
+     - Checks for `WAITING` reservations:
+       - **If reservation found**: sets reservation status to `NOTIFIED_READY` and `pickupDeadline` to `now() + 48 hours`. Does not increment public `availableCopies`.
+       - **If no reservation found**: increments `availableCopies` (capped at `totalCopies`).
+     - Saves `BorrowRecord`.
+  3. Returns updated `BorrowResponse`.
+- **Response**:
+  - `200 OK` returning `BorrowResponse`.
+  - `404 Not Found` if borrow record ID does not exist (`"Borrow Record Not Found"`).
+- **Sample Response Body (`200 OK`)**:
 ```json
 {
-  "borrowId": 101,
+  "borrowId": 1,
   "bookId": 1,
-  "memberName": "Alice Johnson",
+  "memberName": "John Doe",
   "bookTitle": "Clean Code",
-  "borrowDate": "2026-08-12",
-  "dueDate": "2026-08-26",
+  "borrowDate": "2026-07-27",
+  "dueDate": "2026-08-10",
   "returned": true
 }
 ```
 
-#### Error Response (`404 Not Found`)
+---
+
+## 🎟️ 4. Reservation & Waitlist API Endpoints (`/api/reservations`)
+
+Base Path: `/api/reservations`
+
+### 🔹 4.1 Join Waitlist (Create Reservation)
+- **HTTP Method**: `POST`
+- **Path**: `/api/reservations`
+- **Description**: Places a member in the FIFO waitlist queue for an out-of-stock book.
+- **Request Body**: `CreateReservationRequest` (JSON)
+```json
+{
+  "bookId": 1,
+  "memberId": 2
+}
 ```
-Borrow Record Not Found
+- **Validation Rules**:
+  - `bookId`: `@NotNull(message = "Book ID is mandatory")`
+  - `memberId`: `@NotNull(message = "Member ID is mandatory")`
+- **Business Rules**:
+  - Requires `book.availableCopies == 0` (returns `400 Bad Request` if copies are available).
+  - Rejects duplicate active reservations for the same member (`409 Conflict`).
+- **Response**: `201 Created`
+```json
+{
+  "reservationId": 1,
+  "bookId": 1,
+  "bookTitle": "Clean Code",
+  "memberId": 2,
+  "memberName": "Alice Smith",
+  "status": "WAITING",
+  "reservedAt": "2026-09-29T17:45:00",
+  "pickupDeadline": null
+}
 ```
+
+---
+
+### 🔹 4.2 Cancel Reservation
+- **HTTP Method**: `POST`
+- **Path**: `/api/reservations/{id}/cancel`
+- **Description**: Cancels an active reservation. If the reservation was in `NOTIFIED_READY` status, the held copy is automatically reallocated to the next waiting patron, or returned to public inventory if the queue is empty.
+- **Path Variable**: `id` (Long) - Reservation ID
+- **Response**: `200 OK`
+```json
+{
+  "reservationId": 1,
+  "bookId": 1,
+  "bookTitle": "Clean Code",
+  "memberId": 2,
+  "memberName": "Alice Smith",
+  "status": "CANCELLED",
+  "reservedAt": "2026-09-29T17:45:00",
+  "pickupDeadline": null
+}
+```
+
+---
+
+### 🔹 4.3 Get Reservation by ID
+- **HTTP Method**: `GET`
+- **Path**: `/api/reservations/{id}`
+- **Description**: Retrieves details of a specific reservation.
+- **Response**: `200 OK` (or `404 Not Found`)
+
+---
+
+### 🔹 4.4 Get Waitlist Queue for a Book
+- **HTTP Method**: `GET`
+- **Path**: `/api/reservations/book/{bookId}`
+- **Description**: Retrieves all `WAITING` reservations for a book ordered by FIFO priority (`reservedAt ASC`).
+- **Response**: `200 OK` (list of `ReservationResponse`)
+
+---
+
+### 🔹 4.5 Get Member Reservations
+- **HTTP Method**: `GET`
+- **Path**: `/api/reservations/member/{memberId}`
+- **Description**: Retrieves all reservations associated with a member ordered chronologically.
+- **Response**: `200 OK` (list of `ReservationResponse`)
+
+---
+
+## 💰 5. Fine Management API Endpoints (`/api/fines`)
+
+Base Path: `/api/fines`
+
+### 🔹 5.1 Get All Fines (System-wide Ledger)
+- **HTTP Method**: `GET`
+- **Path**: `/api/fines`
+- **Description**: Retrieves all recorded overdue fines across the entire library system.
+- **Authorization**: Required (`Bearer <accessToken>`). Roles: `ADMIN`, `LIBRARIAN`.
+- **Response**: `200 OK` (list of `FineResponse`)
+- **Sample Response Body**:
+```json
+[
+  {
+    "fineId": 1,
+    "borrowId": 12,
+    "bookId": 3,
+    "bookTitle": "Designing Data-Intensive Applications",
+    "memberId": 5,
+    "memberName": "Alice Smith",
+    "amount": 30.00,
+    "paid": false,
+    "calculatedAt": "2026-09-30T00:00:00",
+    "paidAt": null
+  }
+]
+```
+
+---
+
+### 🔹 5.2 Get Member Fines (Least-Privilege Patron Lookup)
+- **HTTP Method**: `GET`
+- **Path**: `/api/fines/member/{memberId}`
+- **Description**: Retrieves all fine records belonging to a specific patron by `memberId`.
+- **Authorization**: Required (`Bearer <accessToken>`). Roles: `ADMIN`, `LIBRARIAN`, `ASSISTANT`.
+- **Path Variable**: `memberId` (Long)
+- **Response**:
+  - `200 OK` (list of `FineResponse`)
+  - `404 Not Found` if member does not exist (`"Member not found with id: X"`)
+
+---
+
+### 🔹 5.3 Pay / Settle an Overdue Fine
+- **HTTP Method**: `POST`
+- **Path**: `/api/fines/{fineId}/pay`
+- **Description**: Marks an outstanding fine as settled and records the payment timestamp.
+- **Authorization**: Required (`Bearer <accessToken>`). Roles: `ADMIN`, `LIBRARIAN`, `ASSISTANT`.
+- **Path Variable**: `fineId` (Long)
+- **Response**:
+  - `200 OK` returning updated `FineResponse` with `paid: true` and `paidAt` timestamp.
+  - `404 Not Found` if fine ID does not exist (`"Fine record not found with id: X"`).
+  - `400 Bad Request` if fine was already paid (`"Fine has already been settled"`).
+- **Sample Response Body**:
+```json
+{
+  "fineId": 1,
+  "borrowId": 12,
+  "bookId": 3,
+  "bookTitle": "Designing Data-Intensive Applications",
+  "memberId": 5,
+  "memberName": "Alice Smith",
+  "amount": 30.00,
+  "paid": true,
+  "calculatedAt": "2026-09-30T00:00:00",
+  "paidAt": "2026-09-30T19:40:00"
+}
+```
+
+---
+
+### 🔹 5.4 Manually Trigger Overdue Fine Reconciliation
+- **HTTP Method**: `POST`
+- **Path**: `/api/fines/reconcile`
+- **Description**: Manually triggers the overdue fine reconciliation engine on demand (in addition to nightly midnight cron).
+- **Authorization**: Required (`Bearer <accessToken>`). Role: `ADMIN`.
+- **Response**: `200 OK` (`"Reconciliation completed. Reconciled X overdue loan(s)."`)
+
+---
+
+## ⚠️ 6. Global Error Handling & HTTP Status Codes
+
+### Application Exceptions (Centralized in `GlobalExceptionHandler.java`):
+
+| Exception Class | HTTP Status Code | Response Body Format |
+|---|---|---|
+| `BookNotFoundException` | `404 NOT_FOUND` | `"Book Not Found"` |
+| `MemberNotFoundException` | `404 NOT_FOUND` | `"Member Not Found"` |
+| `BookUnavailableException` | `404 NOT_FOUND` | `"Book Not available"` |
+| `BorrowRecordNotFoundException` | `404 NOT_FOUND` | `"Borrow Record Not Found"` |
+| `ReservationNotFoundException` | `404 NOT_FOUND` | `"Reservation Not Found"` |
+| `FineNotFoundException` | `404 NOT_FOUND` | `"Fine Record Not Found"` / Detail message |
+| `DuplicateReservationException` | `409 CONFLICT` | `"Member already has an active reservation for this book"` |
+| `IllegalStateException` | `400 BAD_REQUEST` | Message string |
+| `TokenRefreshException` | `401 UNAUTHORIZED` | `"Failed for [token]: message"` |
+| `MethodArgumentNotValidException` | `400 BAD_REQUEST` | `["Error message 1", "Error message 2"]` |
+
+### Security Filter Exceptions (Configured in `SecurityConfig.java`):
+
+| Scenario | HTTP Status Code | Response Body Format |
+|---|---|---|
+| Missing, invalid, or expired JWT token (`AuthenticationEntryPoint`) | `401 UNAUTHORIZED` | `{"error": "Unauthorized", "message": "Full authentication is required to access this resource"}` |
+| Insufficient role / permission (`AccessDeniedHandler`) | `403 FORBIDDEN` | `{"error": "Forbidden", "message": "You do not have permission to access this resource"}` |
+
+

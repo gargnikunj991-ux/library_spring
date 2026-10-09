@@ -1,6 +1,6 @@
-# 🏛️ Architecture & System Design
+# 🏛️ Architecture & System Design -- LibroSphere
 
-This document details the architectural principles, layer responsibilities, design patterns, security design, and request/response workflows of the **Library Management System**.
+This document details the architectural principles, layer responsibilities, design patterns, security design, and request/response workflows of the **Library Management System (LibroSphere)**.
 
 ---
 
@@ -11,7 +11,7 @@ The application is structured strictly around **Clean Layered Architecture**. Ea
 ```
 +-------------------------------------------------------------------------------+
 |                               HTTP CLIENT                                     |
-|             (Postman, Web Frontend, Mobile Client, cURL)                      |
+|             (Postman, Web Frontend, Mobile Client, cURL, Swagger)            |
 +---------------------------------------+---------------------------------------+
                                         |
                                         | JSON Payloads / JWT Bearer Tokens
@@ -29,6 +29,7 @@ The application is structured strictly around **Clean Layered Architecture**. Ea
 +-------------------------------------------------------------------------------+
 |                             CONTROLLER LAYER                                  |
 |   AuthController | BookController | MemberController | Borrowcontroller       |
+|   ReservationController | FineController                                      |
 |   - Exposes RESTful HTTP endpoints (GET, POST, PUT, DELETE)                   |
 |   - Enforces Request Body Validation (@Valid, @NotBlank, @NotNull)            |
 |   - Returns standardized ResponseEntity<DTO> objects                          |
@@ -39,8 +40,9 @@ The application is structured strictly around **Clean Layered Architecture**. Ea
 +-------------------------------------------------------------------------------+
 |                               SERVICE LAYER                                   |
 |   AuthService | BookService | MemberService | BorrowService | JwtService      |
+|   ReservationService | FineService | RefreshTokenService                      |
 |   - Encapsulates Core Business Logic & State Rules                            |
-|   - Transaction Management (@Transactional)                                   |
+|   - Transaction Management (@Transactional) & Row Locking                     |
 |   - Maps Entities <-> DTOs (DTO Isolation)                                    |
 |   - Throws Custom Domain Exceptions                                           |
 +---------------------------------------+---------------------------------------+
@@ -50,8 +52,10 @@ The application is structured strictly around **Clean Layered Architecture**. Ea
 +-------------------------------------------------------------------------------+
 |                             REPOSITORY LAYER                                  |
 |   UserRepository | BookRepository | MemberRepository | BorrowRecordRepository |
+|   BookReservationRepository | FineRecordRepository | RefreshTokenRepository   |
 |   - Spring Data JPA Interfaces extending JpaRepository<T, ID>                 |
-|   - Database Query Abstraction & CRUD Operations                              |
+|   - Pessimistic Row Locking (@Lock(LockModeType.PESSIMISTIC_WRITE))           |
+|   - High-performance composite B-Tree indexed queries                         |
 +---------------------------------------+---------------------------------------+
                                         |
                                         | SQL / JDBC
@@ -59,6 +63,17 @@ The application is structured strictly around **Clean Layered Architecture**. Ea
 +-------------------------------------------------------------------------------+
 |                         POSTGRESQL RELATIONAL DB                              |
 |   users | refresh_tokens | books | members | borrow_records                   |
+|   book_reservations | fine_records                                            |
++-------------------------------------------------------------------------------+
+```
+
+### Background Asynchronous Scheduling
+```
++-------------------------------------------------------------------------------+
+|                       BACKGROUND ASYNC WORKER LAYER                           |
+|   OverdueReconciliationWorker (@Scheduled cron = "0 0 0 * * *")              |
+|   - Nightly automated audit of unreturned overdue loans                       |
+|   - Idempotent tiered fine calculation via FineService                        |
 +-------------------------------------------------------------------------------+
 ```
 
@@ -68,42 +83,54 @@ The application is structured strictly around **Clean Layered Architecture**. Ea
 
 ### 1. Controller Layer (`com.nikunj.library.controller`)
 - **Responsibility**: Handles HTTP ingress and egress, URI routing, request deserialization, payload validation, and HTTP status code dispatching.
+- **Controllers**:
+  - `AuthController`: Handles `/auth/login`, `/auth/register`, `/auth/refresh`, and `/auth/logout`.
+  - `BookController`: Handles book CRUD operations and indexed search (`/api/books/search`).
+  - `MemberController`: Handles member lifecycle management (`/api/members`).
+  - `Borrowcontroller`: Orchestrates book checkouts and return processing (`/api/borrow`).
+  - `ReservationController`: Manages the FIFO waitlist queue and cancellations (`/api/reservations`).
+  - `FineController`: Handles library-wide ledger audits, patron liability lookups, and payment settlements (`/api/fines`).
 - **Rules**:
   - Never interact directly with repositories or entities.
-  - Wrap all outbound responses inside `ResponseEntity<T>` or direct DTO responses.
+  - Return DTOs exclusively.
   - Annotate inbound DTOs with `@Valid` to trigger automatic Jakarta Bean Validation.
 
 ### 2. Service Layer (`com.nikunj.library.service`)
-- **Responsibility**: Contains all domain business logic, transactional orchestrations, and data mappings.
+- **Responsibility**: Contains all domain business logic, transactional orchestrations, concurrency locks, and data mappings.
 - **Rules**:
-  - Enforce business invariants (e.g., verifying `book.isAvailable() == true` before borrowing).
-  - Annotate multi-step mutations with `@Transactional` to guarantee ACID properties.
-  - Never leak JPA entities directly to the Controller layer; always translate entities to response DTOs (`BookResponse`, `MemberResponse`, `BorrowResponse`).
-  - Throw domain-specific runtime exceptions on rule violations (`BookUnavailableException`, `MemberNotFoundException`).
+  - Enforce business invariants (e.g., verifying `availableCopies > 0` before checkout, or checking for active reservations).
+  - Annotate state mutations with `@Transactional` to guarantee ACID atomicity.
+  - Use Pessimistic Locking (`findByIdForUpdate`) for inventory modifications to prevent double-checkouts under high concurrency.
+  - Never leak JPA entities directly to the Controller layer; translate entities to response DTOs.
+  - Throw domain-specific runtime exceptions on rule violations (`BookUnavailableException`, `DuplicateReservationException`).
 
 ### 3. Repository Layer (`com.nikunj.library.repository`)
 - **Responsibility**: Data access abstraction using Spring Data JPA.
-- **Rules**:
-  - Extend `JpaRepository<Entity, Long>`.
-  - Provide declarative query methods (`findByUsername`, `findByToken`, `deleteByUser`).
-  - Rely on Hibernate ORM for parameterized SQL generation to prevent SQL injection.
+- **Repositories**:
+  - `BookRepository`: Includes `@Lock(LockModeType.PESSIMISTIC_WRITE)` query `findByIdForUpdate(Long id)`.
+  - `BookReservationRepository`: Includes FIFO ordering queries `findFirstByBookIdAndStatusOrderByReservedAtAsc`.
+  - `BorrowRecordRepository`: Includes composite query `findByReturnedFalseAndDueDateBefore` for overdue tracking.
+  - `FineRecordRepository`: Includes idempotent query lookups by loan and member.
+  - `MemberRepository`, `UserRepository`, `RefreshTokenRepository`.
 
 ### 4. Entity / Model Layer (`com.nikunj.library.model`)
 - **Responsibility**: Represents relational database tables in Java object form.
-- **Annotations**: `@Entity`, `@Table`, `@Id`, `@GeneratedValue(strategy = IDENTITY)`, `@ManyToOne`, `@JoinColumn`, `@Enumerated(EnumType.STRING)`.
 - **Entities**:
-  - `Book`: Inventory items with title, author, availability flag.
-  - `Member`: Library patrons with name, email, phone number.
-  - `BorrowRecord`: Relational records linking Book and Member with borrow, due, and return dates.
+  - `Book`: Multi-copy inventory (`totalCopies`, `availableCopies`, `title`, `author`).
+  - `Member`: Library patrons (`name`, `email`, `phoneNumber`).
+  - `BorrowRecord`: Relational records linking Book and Member (`borrowDate`, `dueDate`, `returnDate`, `returned`).
+  - `BookReservation`: FIFO waitlist queue items (`status`, `reservedAt`, `pickupDeadline`).
+  - `FineRecord`: Accrued overdue liabilities (`amount`, `paid`, `calculatedAt`, `paidAt`).
   - `User`: System staff credentials with hashed passwords and assigned roles.
   - `RefreshToken`: Cryptographic refresh tokens tied to users for session renewal.
 
-### 5. DTO (Data Transfer Object) Layer (`com.nikunj.library.dto`)
+### 5. Worker Layer (`com.nikunj.library.worker`)
+- **Responsibility**: Background tasks running decoupled from HTTP request threads.
+- **Worker**: `OverdueReconciliationWorker` runs every midnight (`0 0 0 * * *`) via Spring `@Scheduled`, identifying all active loans past their due date and deterministically calculating tiered fines via `FineService`.
+
+### 6. DTO Layer (`com.nikunj.library.dto`)
 - **Responsibility**: Strict contract definition between the client and the server.
-- **Design Decisions**:
-  - Complete decoupling from database entities.
-  - Inbound DTOs (`CreateBookRequest`, `CreateMemberRequest`, `CreateBorrowRequest`, `RegisterRequest`, `LoginRequest`, `RefreshTokenRequest`) contain validation annotations.
-  - Outbound DTOs (`BookResponse`, `MemberResponse`, `BorrowResponse`, `LoginResponse`) contain only client-safe fields.
+- **Decoupling**: Prevents leaking internal database IDs or passwords, isolates database schema refactoring from public API contracts.
 
 ---
 
@@ -121,8 +148,8 @@ The application is structured strictly around **Clean Layered Architecture**. Ea
                      │                       │
            Validate HMAC-SHA256              ▼
          Signature & Expiration     Is Endpoint Public?
-                     │                (/auth/login,
-             Valid?  │                /auth/refresh)
+                     │                (/auth/login, /auth/refresh,
+             Valid?  │                /v3/api-docs/**, /swagger-ui/**)
           ┌──────────┴──────────┐     ┌──────┴──────┐
          YES                    NO   YES            NO
           │                     │     │             │
@@ -152,9 +179,9 @@ The application is structured strictly around **Clean Layered Architecture**. Ea
    - Calling `/auth/refresh` verifies the token in PostgreSQL, checks expiration and revocation status, and returns renewed tokens.
    - Calling `/auth/logout` sets `revoked = true`, instantly invalidating the refresh token.
 3. **Role Hierarchy & RBAC**:
-   - `ADMIN`: Full access (user registration, book deletion, member deletion, all operations).
-   - `LIBRARIAN`: Management access (create/update books and members, process borrow/returns).
-   - `ASSISTANT`: Operational access (view catalog, view members, process borrow/returns).
+   - `ADMIN`: Full access (user registration, catalog deletion, manual fine reconciliation).
+   - `LIBRARIAN`: Management access (catalog management, member operations, fine overview).
+   - `ASSISTANT`: Operational access (catalog search, checkout/returns, patron fine settlements).
 
 ---
 
@@ -170,21 +197,22 @@ Centralized exception handling is implemented via `@ControllerAdvice` in `Global
                                  │
        ┌─────────────────────────┼─────────────────────────┐
        ▼                         ▼                         ▼
- [ Domain 404s ]          [ Validation 400s ]       [ Security 401s ]
- BookNotFoundException    MethodArgumentNotValid    TokenRefreshException
- MemberNotFoundException  Exception                 
- BookUnavailableException (Returns list of field    (Returns error string)
- (Returns clean message)   validation errors)       
+ [ Domain 404s ]          [ Conflict 409s ]         [ Validation 400s ]
+ BookNotFoundException    DuplicateReservation      MethodArgumentNotValid
+ MemberNotFoundException  Exception                 Exception
+ BorrowRecordNotFound     (Active waitlist          (Field validation
+ Exception                conflict)                 errors)
+ FineNotFoundException
+ ReservationNotFound
+ Exception
+ BookUnavailableException
 ```
-
-- **Clean Client Contract**: Prevents leaking internal database details or Java stack traces.
-- **Configuration Safeguards**: `server.error.include-stacktrace=never` ensures server errors never expose internal file paths.
 
 ---
 
-## 🔄 Complete Request-Response Lifecycle Example
+## 🔄 Sequence Workflows
 
-### Borrow Book Workflow (`POST /api/borrow`)
+### 1. Concurrency-Safe Borrow Workflow (`POST /api/borrow`)
 ```mermaid
 sequenceDiagram
     autonumber
@@ -198,23 +226,54 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     Client->>Sec: POST /api/borrow (Bearer JWT + JSON)
-    Sec->>Sec: Validate JWT & Role (ADMIN/LIBRARIAN/ASSISTANT)
-    Sec->>Ctrl: Forward validated request
-    Ctrl->>Ctrl: Validate DTO (@Valid CreateBorrowRequest)
+    Sec->>Ctrl: Forward authenticated request
     Ctrl->>Svc: borrowBook(request)
     Svc->>MRepo: findById(memberId)
-    MRepo->>DB: SELECT * FROM members WHERE member_id = ?
-    DB-->>Svc: Member entity
-    Svc->>BRepo: findById(bookId)
-    BRepo->>DB: SELECT * FROM books WHERE id = ?
+    MRepo-->>Svc: Member entity
+    Svc->>BRepo: findByIdForUpdate(bookId)
+    Note over BRepo,DB: SELECT ... FOR UPDATE (Row Lock)
     DB-->>Svc: Book entity
-    Svc->>Svc: Verify book.isAvailable() == true
-    Svc->>Svc: book.setAvailable(false)
-    Svc->>BRepo: save(book)
-    Svc->>BrRepo: save(BorrowRecord)
-    BrRepo->>DB: INSERT INTO borrow_records (...)
-    DB-->>Svc: Saved BorrowRecord
-    Svc->>Svc: Map entity to BorrowResponse DTO
+    alt Available Copies > 0
+        Svc->>Svc: book.setAvailableCopies(copies - 1)
+        Svc->>BRepo: save(book)
+        Svc->>BrRepo: save(BorrowRecord)
+        DB-->>Svc: Persisted loan
+        Svc-->>Ctrl: BorrowResponse
+        Ctrl-->>Client: 200 OK
+    else Available Copies == 0
+        Svc-->>Ctrl: throw BookUnavailableException
+        Ctrl-->>Client: 404 Book Unavailable
+    end
+```
+
+### 2. Return & FIFO Waitlist Auto-Assignment (`POST /api/borrow/return/{borrowId}`)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Client as HTTP Client
+    participant Ctrl as Borrowcontroller
+    participant Svc as BorrowService
+    participant BrRepo as BorrowRecordRepository
+    participant ResRepo as BookReservationRepository
+    participant BRepo as BookRepository
+    participant DB as PostgreSQL
+
+    Client->>Ctrl: POST /api/borrow/return/{borrowId}
+    Ctrl->>Svc: returnBook(borrowId)
+    Svc->>BrRepo: findById(borrowId)
+    Svc->>Svc: Mark returned = true, returnDate = now()
+    Svc->>BRepo: findByIdForUpdate(bookId)
+    Svc->>ResRepo: findFirstByBookIdAndStatusOrderByReservedAtAsc(bookId, WAITING)
+    alt Waiting Patron Exists in Queue
+        ResRepo-->>Svc: Reservation entity
+        Svc->>Svc: reservation.setStatus(NOTIFIED_READY)
+        Svc->>Svc: reservation.setPickupDeadline(now + 48h)
+        Note over Svc: Do NOT increment availableCopies (held exclusively)
+        Svc->>ResRepo: save(reservation)
+    else Queue is Empty
+        Svc->>Svc: book.setAvailableCopies(copies + 1)
+        Svc->>BRepo: save(book)
+    end
     Svc-->>Ctrl: BorrowResponse
-    Ctrl-->>Client: 200 OK (ResponseEntity<BorrowResponse>)
+    Ctrl-->>Client: 200 OK
 ```

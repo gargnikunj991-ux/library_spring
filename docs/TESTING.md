@@ -1,6 +1,6 @@
-# 🧪 Testing Strategy & Test Reference
+# 🧪 Testing Strategy & Test Reference -- LibroSphere
 
-This document outlines the testing philosophy, automated test execution, test matrices, and manual API verification test cases for the **Library Management System**.
+This document outlines the testing methodology, automated test suites, test matrix, and verification test cases for the **Library Management System (LibroSphere)**.
 
 ---
 
@@ -11,148 +11,130 @@ The testing strategy follows the standard **Testing Pyramid**:
 ```
            / \
           /   \
-         /     \
-        /  E2E  \       cURL / Postman / Manual Smoke Testing
-       /─────────\
-      /  Integr.  \     @SpringBootTest / MockMvc REST Controller & JPA Tests
-     /─────────────\
-    /     Unit      \   JUnit 5 & Mockito Service Layer Business Logic Tests
-   /─────────────────\
+         /  E2E  \       cURL / Postman / Swagger UI Manual Testing
+        /─────────\
+       /  Integr.  \     @SpringBootTest Multi-Threaded Concurrency & Waitlist Suites
+      /─────────────\
+     /     Unit      \   JUnit 5 & Mockito Service Layer & Worker Tests (66 Tests Total)
+    /─────────────────\
 ```
 
 1. **Unit Testing**: Tests isolated business logic in `Service` classes using JUnit 5 and Mockito, mocking repository interactions.
-2. **Integration Testing**: Verifies full request lifecycle, Spring Security filter chains, JSON serialization/deserialization, and `@ControllerAdvice` error mapping using `MockMvc`.
-3. **Database Testing**: Verifies JPA entity relationships, cascading, constraints, and custom queries using `@DataJpaTest` with test profiles or test containers.
-4. **Manual & API Contract Testing**: Validates end-to-end flows with real PostgreSQL instances using Postman or cURL.
+2. **Multi-Threaded Concurrency Stress Testing**: Uses `CountDownLatch` and `ExecutorService` with 10 concurrent threads to prove zero double-checkouts under high contention.
+3. **Integration Testing**: Verifies multi-step workflows (e.g. checkout, waitlist auto-assignment on return) using real transactions and H2 database.
+4. **Worker Testing**: Verifies `@Scheduled` background worker delegation and idempotent overdue fine calculations.
 
 ---
 
 ## 🚀 Running Automated Tests
 
-### 1. Compile and Validate Tests
+### 1. Compile Test Sources
 ```bash
 mvn clean test-compile
 ```
 
-### 2. Execute Full Test Suite
+### 2. Execute Full Test Suite (66 Tests)
 ```bash
 mvn test
 ```
 
-### 3. Run a Specific Test Class
+### 3. Run Specific Test Suites
 ```bash
-mvn test -Dtest=LibraryApplicationTests
+# Concurrency stress test
+mvn test -Dtest=BorrowConcurrencyIntegrationTest
+
+# Reservation & return integration test
+mvn test -Dtest=BorrowReservationIntegrationTest
+
+# Fine reconciliation tests
+mvn test -Dtest=FineServiceTest,OverdueReconciliationWorkerTest
 ```
 
 ---
 
-## 📋 Comprehensive Test Cases Matrix
+## 📊 Automated Test Suite Breakdown (66 Tests, 100% Pass Rate)
 
-### 📚 1. Book Management Test Matrix (`/api/books`)
-
-| Case ID | Scenario | HTTP Method | Endpoint | Expected Status | Expected Result / Body |
-|---|---|---|---|---|---|
-| `BK-01` | Create book with valid payload | `POST` | `/api/books` | `200 OK` | Returns created `BookResponse` with generated ID |
-| `BK-02` | Create book with blank title | `POST` | `/api/books` | `400 Bad Request` | Returns `["Title cannot be blank"]` |
-| `BK-03` | Create book with blank author | `POST` | `/api/books` | `400 Bad Request` | Returns `["Author cannot be blank"]` |
-| `BK-04` | Get all books | `GET` | `/api/books` | `200 OK` | Returns JSON array of all books |
-| `BK-05` | Get book by valid existing ID | `GET` | `/api/books/1` | `200 OK` | Returns `BookResponse` object |
-| `BK-06` | Get book by non-existent ID | `GET` | `/api/books/999` | `404 Not Found` | Returns `"Book Not Found"` |
-| `BK-07` | Update book by valid ID | `PUT` | `/api/books/1` | `200 OK` | Returns updated `BookResponse` |
-| `BK-08` | Update book with non-existent ID | `PUT` | `/api/books/999` | `404 Not Found` | Returns `"Book Not Found"` |
-| `BK-09` | Delete book by valid ID (Admin) | `DELETE` | `/api/books/1` | `200 OK` | Record deleted from PostgreSQL |
-| `BK-10` | Delete book by non-existent ID | `DELETE` | `/api/books/999` | `404 Not Found` | Returns `"Book Not Found"` |
-| `BK-11` | Delete book as Non-Admin (Assistant) | `DELETE` | `/api/books/1` | `403 Forbidden` | Access denied error message |
-
----
-
-### 👤 2. Member Management Test Matrix (`/api/members`)
-
-| Case ID | Scenario | HTTP Method | Endpoint | Expected Status | Expected Result / Body |
-|---|---|---|---|---|---|
-| `MB-01` | Register valid member | `POST` | `/api/members` | `200 OK` | Returns `MemberResponse` with `memberId` |
-| `MB-02` | Register member with invalid email | `POST` | `/api/members` | `400 Bad Request` | Returns `["must be a well-formed email address"]` |
-| `MB-03` | Register member with blank name | `POST` | `/api/members` | `400 Bad Request` | Returns `["name cannot be blank"]` |
-| `MB-04` | Get member by existing ID | `GET` | `/api/members/1` | `200 OK` | Returns `MemberResponse` |
-| `MB-05` | Get member by missing ID | `GET` | `/api/members/999` | `404 Not Found` | Returns `"Member Not Found"` |
-| `MB-06` | Delete member by valid ID (Admin) | `DELETE` | `/api/members/1` | `200 OK` | Member record removed |
-| `MB-07` | Delete member as Non-Admin | `DELETE` | `/api/members/1` | `403 Forbidden` | Access denied |
+| Test Class | Category | Test Count | Scope & Behaviors Verified |
+|---|---|:---:|---|
+| [`BorrowConcurrencyIntegrationTest`](file:///D:/library/library/src/test/java/com/nikunj/library/service/BorrowConcurrencyIntegrationTest.java) | Concurrency Integration | 1 | 10 concurrent threads contending for single copy; validates exactly 1 success, 9 rejections, 0 inventory underflow. |
+| [`BorrowReservationIntegrationTest`](file:///D:/library/library/src/test/java/com/nikunj/library/service/BorrowReservationIntegrationTest.java) | Integration | 1 | End-to-end return workflow verifying returned copy is held exclusively for FIFO waitlist patron with 48h deadline. |
+| [`ReservationServiceTest`](file:///D:/library/library/src/test/java/com/nikunj/library/service/ReservationServiceTest.java) | Unit | 12 | Queue entry, out-of-stock validation, duplicate waitlist rejection (409), cancellations, and FIFO ordering. |
+| [`FineServiceTest`](file:///D:/library/library/src/test/java/com/nikunj/library/service/FineServiceTest.java) | Unit | 12 | Graduated tiered overdue calculation (Days 1–5, 6–15, 16+), idempotent updates, payment settlement, lookups. |
+| [`OverdueReconciliationWorkerTest`](file:///D:/library/library/src/test/java/com/nikunj/library/worker/OverdueReconciliationWorkerTest.java) | Worker Unit | 2 | Scheduled cron audit execution and service delegation without duplicate billing. |
+| [`BorrowServiceTest`](file:///D:/library/library/src/test/java/com/nikunj/library/service/BorrowServiceTest.java) | Unit | 10 | Concurrency-safe checkout, inventory decrements, return date stamping, exception handling. |
+| [`BookServiceTest`](file:///D:/library/library/src/test/java/com/nikunj/library/service/BookServiceTest.java) | Unit | 10 | CRUD operations, not found handling, indexed multi-column catalog search queries. |
+| [`MemberServiceTest`](file:///D:/library/library/src/test/java/com/nikunj/library/service/MemberServiceTest.java) | Unit | 5 | Member registry CRUD, email validation, and lookup error handling. |
+| [`AuthServiceTest`](file:///D:/library/library/src/test/java/com/nikunj/library/service/AuthServiceTest.java) | Unit | 4 | BCrypt user registration, credential verification, JWT issuance, and logout. |
+| [`RefreshTokenServiceTest`](file:///D:/library/library/src/test/java/com/nikunj/library/service/RefreshTokenServiceTest.java) | Unit | 6 | UUID refresh token creation, expiration verification, revocation, and rotation. |
+| [`DataInitializerTest`](file:///D:/library/library/src/test/java/com/nikunj/library/config/DataInitializerTest.java) | Unit | 2 | Startup command line runner admin bootstrapping and idempotency. |
+| [`LibraryApplicationTests`](file:///D:/library/library/src/test/java/com/nikunj/library/LibraryApplicationTests.java) | Context | 1 | Spring Boot application context load verification. |
+| **Total** | | **66** | **All Passing (0 Failures, 0 Errors, 0 Skipped)** |
 
 ---
 
-### 📖 3. Borrowing & Return Workflow Test Matrix (`/api/borrow`)
+## 📋 Comprehensive REST API Test Matrix
 
-| Case ID | Scenario | HTTP Method | Endpoint | Expected Status | Expected Result / Body |
-|---|---|---|---|---|---|
-| `BW-01` | Borrow available book | `POST` | `/api/borrow` | `200 OK` | Returns `BorrowResponse`, sets `book.available = false`, sets `dueDate = today + 14` |
-| `BW-02` | Borrow already checked out book | `POST` | `/api/borrow` | `404 Not Found` | Returns `"Book Not available"` |
-| `BW-03` | Borrow with non-existent memberId | `POST` | `/api/borrow` | `404 Not Found` | Returns `"Member Not Found"` |
-| `BW-04` | Borrow with non-existent bookId | `POST` | `/api/borrow` | `404 Not Found` | Returns `"Book Not Found"` |
-| `BW-05` | Return borrowed book by valid borrowId | `POST` | `/api/borrow/return/1` | `200 OK` | Returns `BorrowResponse`, sets `returned = true`, resets `book.available = true` |
-| `BW-06` | Return with non-existent borrowId | `POST` | `/api/borrow/return/999` | `404 Not Found` | Returns `"Borrow Record Not Found"` |
+### 📚 1. Book Catalog & Search (`/api/books`)
 
----
-
-### 🔒 4. Authentication & Security Test Matrix (`/auth`)
-
-| Case ID | Scenario | HTTP Method | Endpoint | Expected Status | Expected Result / Body |
-|---|---|---|---|---|---|
-| `AU-01` | Login with valid credentials | `POST` | `/auth/login` | `200 OK` | Returns `accessToken`, `refreshToken`, `tokenType` |
-| `AU-02` | Login with invalid password | `POST` | `/auth/login` | `401 Unauthorized` | Returns `"Bad credentials"` |
-| `AU-03` | Refresh token with valid refresh token | `POST` | `/auth/refresh` | `200 OK` | Returns renewed `accessToken` and `refreshToken` |
-| `AU-04` | Refresh token with invalid/expired token | `POST` | `/auth/refresh` | `401 Unauthorized` | Returns `"Refresh token was expired..."` |
-| `AU-05` | Logout authenticated user | `POST` | `/auth/logout` | `200 OK` | Sets `revoked = true` in PostgreSQL |
-| `AU-06` | Access protected endpoint without token | `GET` | `/api/books` | `401 Unauthorized` | `"Full authentication is required..."` |
+| Case ID | Scenario | Method | Endpoint | Expected Status |
+|---|---|---|---|---|
+| `BK-01` | Create book with valid payload | `POST` | `/api/books` | `200 OK` |
+| `BK-02` | Create book with blank title / author | `POST` | `/api/books` | `400 Bad Request` |
+| `BK-03` | Create book with totalCopies < 1 | `POST` | `/api/books` | `400 Bad Request` |
+| `BK-04` | Get all books | `GET` | `/api/books` | `200 OK` |
+| `BK-05` | Search books by keyword matching title/author | `GET` | `/api/books/search?query=clean` | `200 OK` |
+| `BK-06` | Get book by valid existing ID | `GET` | `/api/books/{id}` | `200 OK` |
+| `BK-07` | Get book by non-existent ID | `GET` | `/api/books/999` | `404 Not Found` |
+| `BK-08` | Update book by valid ID | `PUT` | `/api/books/{id}` | `200 OK` |
+| `BK-09` | Delete book as ADMIN | `DELETE` | `/api/books/{id}` | `200 OK` |
+| `BK-10` | Delete book as Non-Admin (LIBRARIAN/ASSISTANT) | `DELETE` | `/api/books/{id}` | `403 Forbidden` |
 
 ---
 
-## 🛠️ Step-by-Step Manual Verification with cURL
+### 👤 2. Member Management (`/api/members`)
 
-### 1. Authenticate and Store JWT
-```bash
-# Save login response to a variable
-TOKEN=$(curl -s -X POST http://localhost:8080/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "AdminPassword123!"}' | jq -r '.accessToken')
-```
+| Case ID | Scenario | Method | Endpoint | Expected Status |
+|---|---|---|---|---|
+| `MB-01` | Register valid member | `POST` | `/api/members` | `200 OK` |
+| `MB-02` | Register member with invalid email syntax | `POST` | `/api/members` | `400 Bad Request` |
+| `MB-03` | Get member by existing ID | `GET` | `/api/members/{memberId}` | `200 OK` |
+| `MB-04` | Get member by missing ID | `GET` | `/api/members/999` | `404 Not Found` |
+| `MB-05` | Delete member as ADMIN | `DELETE` | `/api/members/{memberId}` | `200 OK` |
+| `MB-06` | Delete member as Non-Admin | `DELETE` | `/api/members/{memberId}` | `403 Forbidden` |
 
-### 2. Verify Valid Book Creation (200 OK)
-```bash
-curl -X POST http://localhost:8080/api/books \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Refactoring", "author": "Martin Fowler", "available": true}'
-```
+---
 
-### 3. Verify Validation Error on Blank Book Title (400 Bad Request)
-```bash
-curl -X POST http://localhost:8080/api/books \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"title": "", "author": "Martin Fowler"}'
-```
+### 📖 3. Concurrency Borrow & Return (`/api/borrow`)
 
-### 4. Verify Not Found Error (404 Not Found)
-```bash
-curl -X GET http://localhost:8080/api/books/99999 \
-  -H "Authorization: Bearer $TOKEN"
-```
+| Case ID | Scenario | Method | Endpoint | Expected Status |
+|---|---|---|---|---|
+| `BW-01` | Borrow available book (copies > 0) | `POST` | `/api/borrow` | `200 OK` (decrements copies) |
+| `BW-02` | Borrow exhausted book (copies == 0) | `POST` | `/api/borrow` | `404 Not Found` (`Book Unavailable`) |
+| `BW-03` | Return book with no waiting reservations | `POST` | `/api/borrow/return/{borrowId}` | `200 OK` (increments copies) |
+| `BW-04` | Return book with active FIFO waitlist | `POST` | `/api/borrow/return/{borrowId}` | `200 OK` (locks copy for next member) |
 
-### 5. Verify Complete Borrow and Return Lifecycle
-```bash
-# 1. Borrow book 1 for member 1
-curl -X POST http://localhost:8080/api/borrow \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"bookId": 1, "memberId": 1}'
+---
 
-# 2. Attempt duplicate borrow (should fail with 404 Book Not available)
-curl -X POST http://localhost:8080/api/borrow \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"bookId": 1, "memberId": 1}'
+### 🎟️ 4. FIFO Waitlist Reservations (`/api/reservations`)
 
-# 3. Return the book
-curl -X POST http://localhost:8080/api/borrow/return/1 \
-  -H "Authorization: Bearer $TOKEN"
-```
+| Case ID | Scenario | Method | Endpoint | Expected Status |
+|---|---|---|---|---|
+| `RS-01` | Join waitlist when copies == 0 | `POST` | `/api/reservations` | `201 Created` (`WAITING`) |
+| `RS-02` | Join waitlist when copies > 0 | `POST` | `/api/reservations` | `400 Bad Request` |
+| `RS-03` | Duplicate active reservation for same member | `POST` | `/api/reservations` | `409 Conflict` |
+| `RS-04` | Cancel active reservation | `POST` | `/api/reservations/{id}/cancel` | `200 OK` (`CANCELLED`) |
+| `RS-05` | Get waitlist queue for a book (FIFO ordered) | `GET` | `/api/reservations/book/{bookId}` | `200 OK` |
+| `RS-06` | Get reservations for a member | `GET` | `/api/reservations/member/{memberId}` | `200 OK` |
+
+---
+
+### 💰 5. Fine Management (`/api/fines`)
+
+| Case ID | Scenario | Method | Endpoint | Expected Status |
+|---|---|---|---|---|
+| `FN-01` | View library-wide fines as ADMIN/LIBRARIAN | `GET` | `/api/fines` | `200 OK` |
+| `FN-02` | View library-wide fines as ASSISTANT | `GET` | `/api/fines` | `403 Forbidden` |
+| `FN-03` | View member fines as ASSISTANT | `GET` | `/api/fines/member/{memberId}` | `200 OK` |
+| `FN-04` | Settle fine payment | `POST` | `/api/fines/{fineId}/pay` | `200 OK` (`paid = true`) |
+| `FN-05` | Pay already settled fine | `POST` | `/api/fines/{fineId}/pay` | `400 Bad Request` |
+| `FN-06` | Manually trigger reconciliation as ADMIN | `POST` | `/api/fines/reconcile` | `200 OK` |

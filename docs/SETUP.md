@@ -1,6 +1,6 @@
-# 🚀 Local Environment Setup & Installation Guide
+# 🚀 Local Environment Setup & Installation Guide -- LibroSphere
 
-This guide walks you through setting up and running the **Library Management System** on a fresh machine from scratch.
+This guide walks you through setting up and running the **Library Management System (LibroSphere)** on a fresh machine from scratch.
 
 ---
 
@@ -12,9 +12,10 @@ Ensure you have the following installed on your operating system:
 |---|---|---|---|
 | **Java Development Kit (JDK)** | Java 21 (LTS) | `java -version` | [Adoptium Temurin 21](https://adoptium.net/) |
 | **PostgreSQL Database** | 15 or 16+ | `psql --version` | [PostgreSQL Downloads](https://www.postgresql.org/download/) |
+| **Docker & Docker Compose** (Optional) | Latest | `docker compose version` | [Docker Desktop](https://www.docker.com/) |
 | **Apache Maven** (Optional) | 3.9+ | `mvn -version` | *(Maven Wrapper `./mvnw` is included in repo)* |
 | **Git** | Latest | `git --version` | [Git SCM](https://git-scm.com/) |
-| **REST Client** (Optional) | Any | - | [Postman](https://www.postman.com/) or VS Code REST Client |
+| **REST Client** (Optional) | Any | - | [Postman](https://www.postman.com/) or Swagger UI |
 
 ---
 
@@ -38,17 +39,13 @@ cd library
    ```sql
    CREATE DATABASE library;
    ```
-3. Verify the database exists:
-   ```sql
-   \l
-   ```
-4. Exit `psql`:
+3. Exit `psql`:
    ```sql
    \q
    ```
 
 > [!NOTE]
-> Hibernate will automatically generate all tables (`users`, `refresh_tokens`, `books`, `members`, `borrow_records`) upon application startup via `spring.jpa.hibernate.ddl-auto=update`.
+> Hibernate will automatically generate all 7 tables (`users`, `refresh_tokens`, `books`, `members`, `borrow_records`, `book_reservations`, `fine_records`) and composite B-tree indexes upon application startup via `spring.jpa.hibernate.ddl-auto=update`.
 
 ---
 
@@ -63,7 +60,7 @@ cd library
      ```powershell
      Copy-Item .env.example .env
      ```
-2. Open `.env` in your text editor and verify the credentials:
+2. Open `.env` and configure your credentials:
    ```properties
    DB_URL=jdbc:postgresql://localhost:5432/library
    DB_USERNAME=postgres
@@ -77,7 +74,7 @@ cd library
 
 ### Step 4: Build & Compile the Project
 
-Use Maven or the bundled Maven Wrapper to clean, resolve dependencies, and compile:
+Use Maven or the bundled Maven Wrapper to clean and compile test sources:
 
 - **Windows (PowerShell / CMD)**:
   ```powershell
@@ -102,7 +99,14 @@ Use Maven or the bundled Maven Wrapper to clean, resolve dependencies, and compi
 ./mvnw spring-boot:run
 ```
 
-#### Option B: Build and Run Standalone JAR (Production Mode)
+#### Option B: Run via Docker Compose (Zero Local DB Setup)
+If you have Docker installed, you don't even need local PostgreSQL:
+```bash
+docker-compose up -d --build
+```
+This spins up PostgreSQL 16 Alpine and the backend in isolated containers.
+
+#### Option C: Build and Run Standalone JAR
 ```bash
 # Package executable JAR
 .\mvnw.cmd clean package -DskipTests
@@ -111,25 +115,23 @@ Use Maven or the bundled Maven Wrapper to clean, resolve dependencies, and compi
 java -jar target/library-0.0.1-SNAPSHOT.jar
 ```
 
-The server will start listening on `http://localhost:8080`.
+The server will start listening on **`http://localhost:8080`**.  
+Interactive Swagger UI is available at **`http://localhost:8080/swagger-ui/index.html`**.
 
 ---
 
 ## 🧪 First-Time Verification & Quick Smoke Test
 
-### 1. Register the Initial Admin User
-Because `/auth/register` is protected in standard operation, you can seed your initial administrator account:
-```bash
-curl -X POST http://localhost:8080/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "AdminPassword123!", "role": "ADMIN"}'
-```
+### 1. Default Admin User (Auto-Seeded)
+The application automatically seeds a default `ADMIN` user on first boot via `DataInitializer`:
+- **Username**: `admin`
+- **Password**: `admin123`
 
-### 2. Login to Receive JWT Tokens
+### 2. Login to Receive JWT Access and Refresh Tokens
 ```bash
 curl -X POST http://localhost:8080/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username": "admin", "password": "AdminPassword123!"}'
+  -d '{"username": "admin", "password": "admin123"}'
 ```
 *Output*:
 ```json
@@ -140,12 +142,12 @@ curl -X POST http://localhost:8080/auth/login \
 }
 ```
 
-### 3. Add a Book Using the Access Token
+### 3. Add a Multi-Copy Book Using the Access Token
 ```bash
 curl -X POST http://localhost:8080/api/books \
   -H "Authorization: Bearer <YOUR_ACCESS_TOKEN>" \
   -H "Content-Type: application/json" \
-  -d '{"title": "Clean Architecture", "author": "Robert C. Martin", "available": true}'
+  -d '{"title": "Clean Architecture", "author": "Robert C. Martin", "totalCopies": 3}'
 ```
 
 ---
@@ -158,19 +160,19 @@ curl -X POST http://localhost:8080/api/books \
   - **Windows**: Open `services.msc`, locate `postgresql-x64-16`, and click **Start**.
   - **Linux**: `sudo systemctl start postgresql`
   - **macOS (Homebrew)**: `brew services start postgresql@16`
+  - Or use Docker Compose: `docker-compose up -d`.
 
 ### ❌ 2. `FATAL: password authentication failed for user "postgres"`
-- **Cause**: The password specified in `.env` under `DB_PASSWORD` does not match your local PostgreSQL `postgres` user password.
-- **Solution**: Update `DB_PASSWORD` in `.env` or reset your PostgreSQL password via `ALTER USER postgres WITH PASSWORD 'newpassword';`.
+- **Cause**: The password specified in `.env` under `DB_PASSWORD` does not match your PostgreSQL server.
+- **Solution**: Update `DB_PASSWORD` in `.env` or reset PostgreSQL password via `ALTER USER postgres WITH PASSWORD 'newpassword';`.
 
 ### ❌ 3. `Web server failed to start. Port 8080 was already in use.`
 - **Cause**: Another service or IDE process is holding port 8080.
 - **Solution**:
-  - Kill existing process:
-    - **Windows**: `netstat -ano | findstr :8080` then `taskkill /PID <PID> /F`
-    - **Linux/macOS**: `lsof -i :8080` then `kill -9 <PID>`
-  - Or specify another port in `.env`: `SERVER_PORT=8081`.
+  - Windows: `netstat -ano | findstr :8080` then `taskkill /PID <PID> /F`
+  - Linux/macOS: `lsof -i :8080` then `kill -9 <PID>`
+  - Or change port in `.env`: `SERVER_PORT=8081`.
 
 ### ❌ 4. `The specified key byte array is confirmed to be ... bits, but HMAC-SHA256 requires at least 256 bits`
-- **Cause**: `JWT_SECRET` in `.env` is either empty or too short.
-- **Solution**: Use a 256-bit base64 secret (at least 32 bytes) like the default provided in `.env.example`.
+- **Cause**: `JWT_SECRET` in `.env` is too short or empty.
+- **Solution**: Use the 256-bit base64 secret key provided in `.env.example`.
